@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.6 — 2026-09-22
+
+- See the GitHub release notes for the included changes.
+
 ## 0.2.5 — 2026-09-19
 - Open Reading-mode comments by clicking highlighted passages instead of hovering; keep previews open until dismissed.
 - Preserve text selection when dragging across highlights and keep comment editing, deletion, and keyboard access available.

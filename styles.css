@@ -11,12 +11,7 @@
 .pdfaw-root button { color: inherit; font: inherit; cursor: pointer; box-shadow: none; }
 .pdfaw-root button:focus-visible, .pdfaw-root input:focus-visible, .pdfaw-comment-card:focus-visible { outline: 2px solid var(--pdfaw-accent); outline-offset: 3px; }
 .pdfaw-root svg { width: 17px; height: 17px; flex-shrink: 0; }
-.pdfaw-header, .pdfaw-toolbar, .pdfaw-footer { display: flex; align-items: center; flex-shrink: 0; border-bottom: 1px solid var(--pdfaw-border); }
-.pdfaw-header { min-height: 49px; padding: 8px 18px; gap: 24px; background: linear-gradient(110deg, #252a32, #181c20 65%); }
-.pdfaw-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.pdfaw-brand > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pdfaw-brand-icon { display: flex; color: var(--pdfaw-accent); }
-.pdfaw-label { font-size: 9px; letter-spacing: 1.8px; color: var(--pdfaw-muted); padding: 2px 6px; border: 1px solid var(--pdfaw-border); border-radius: 4px; }
+.pdfaw-toolbar { display: flex; align-items: center; flex-shrink: 0; border-bottom: 1px solid var(--pdfaw-border); }
 .pdfaw-search { display: flex; align-items: center; margin-left: auto; border: 1px solid var(--pdfaw-border); border-radius: 7px; padding: 0 5px 0 9px; gap: 6px; color: var(--pdfaw-muted); background: #15191d; }
 .pdfaw-search > span:first-child { display: flex; }
 .pdfaw-search input { border: none; background: none; box-shadow: none; color: var(--pdfaw-text); width: 190px; height: 29px; padding: 4px; font-size: 12px; }
@@ -86,6 +81,10 @@
 .pdfaw-category-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--category); flex-shrink: 0; }
 .pdfaw-root [hidden][hidden] { display: none; }
 .pdfaw-selection-toolbar { position: absolute; display: flex; padding: 5px; border: 1px solid #555363; background: #252830; border-radius: 8px; box-shadow: 0 4px 18px #0007; z-index: 15; }
+.pdfaw-selection-toolbar.is-vertical { flex-direction: column; }
+.pdfaw-selection-toolbar .pdfaw-selection-handle { cursor: grab; color: var(--pdfaw-muted); }
+.pdfaw-selection-toolbar .pdfaw-selection-handle:active { cursor: grabbing; }
+.pdfaw-status { display: none; }
 .pdfaw-selection-toolbar .pdfaw-icon-button { color: var(--category); }
 /* Composite the whole selection once, so even intersecting glyph boxes cannot
    darken each other while the native selection is being dragged. */
@@ -104,7 +103,7 @@
 .pdfaw-preview-actions { display: flex; gap: 8px; margin-top: 12px; }
 .pdfaw-preview-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid var(--pdfaw-border); border-radius: 4px; background: var(--pdfaw-control); color: var(--pdfaw-text); cursor: pointer; font: inherit; font-size: 12px; }
 .pdfaw-preview-actions button:hover, .pdfaw-preview-actions button:focus-visible { border-color: var(--pdfaw-accent); color: var(--pdfaw-accent); }
-.pdfaw-preview-actions button[title="Delete comment"]:hover, .pdfaw-preview-actions button[title="Delete comment"]:focus-visible { border-color: var(--text-error); color: var(--text-error); }
+.pdfaw-preview-actions button[aria-label="Delete comment"]:hover, .pdfaw-preview-actions button[aria-label="Delete comment"]:focus-visible { border-color: var(--text-error); color: var(--text-error); }
 .pdfaw-comment-preview:focus-visible { outline: 2px solid var(--pdfaw-accent); outline-offset: -2px; }
 .pdfaw-root .pdfaw-read-comments { display: none; }
 .pdfaw-reading .pdfaw-read-comments { display: inline-flex; }
@@ -112,32 +111,21 @@
 .pdfaw-reading .pdfaw-stage { position: relative; flex-shrink: 0; will-change: auto; transform: none; margin: 24px auto; width: var(--reading-width); height: var(--reading-height); }
 .pdfaw-reading .pdfaw-page { transform-origin: 0 0; transform: var(--reading-transform); }
 .pdfaw-reading .pdfaw-cards, .pdfaw-reading .pdfaw-connections,
-.pdfaw-reading .pdfaw-minimap, .pdfaw-reading .pdfaw-filters,
-.pdfaw-reading .pdfaw-footer-help { display: none; }
+.pdfaw-reading .pdfaw-filters { display: none; }
 @media (max-width: 500px) {
-  .pdfaw-header { flex-wrap: wrap; }
   .pdfaw-search { width: 100%; }
   .pdfaw-search input { flex: 1; min-width: 0; }
   .pdfaw-root .pdfaw-pages { flex-basis: 80px; }
   .pdfaw-thumbnail-paper { width: 52px; min-height: 74px; overflow: hidden; }
   .pdfaw-thumbnail-paper canvas { max-width: 52px; height: auto; }
-  .pdfaw-show-notes .pdfaw-notes-panel { position: absolute; right: 0; top: 140px; bottom: 30px; width: min(260px, 100%); z-index: 20; }
+  .pdfaw-show-notes .pdfaw-notes-panel { position: absolute; right: 0; top: 90px; bottom: 0; width: min(260px, 100%); z-index: 20; }
 }
-.pdfaw-minimap { position: absolute; right: 14px; bottom: 14px; width: 173px; padding: 9px 8px 4px; border: 1px solid #3a424e; border-radius: 10px; background: #191d22ee; box-shadow: 0 4px 20px #0004; z-index: 10; }
-.pdfaw-minimap .pdfaw-map { display: block; width: 155px; height: 89px; cursor: crosshair; }
-.pdfaw-map-tools { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--pdfaw-border); margin-top: 7px; padding-top: 3px; }
-.pdfaw-map-tools > span { font-size: 10px; color: var(--pdfaw-muted); }
-.pdfaw-map-tools .pdfaw-icon-button { width: 24px; min-width: 24px; height: 26px; padding: 4px; }
 .pdfaw-hand .pdfaw-viewport, .pdfaw-hand .pdfaw-page { cursor: grab; }
 .pdfaw-hand .pdfaw-textlayer { pointer-events: none; user-select: none; }
 .pdfaw-root .pdfaw-viewport.is-panning, .pdfaw-root .pdfaw-viewport.is-panning * { cursor: grabbing; }
 .pdfaw-notes-panel { display: none; flex: 0 0 260px; border-left: 1px solid var(--pdfaw-border); background: var(--pdfaw-panel); }
 .pdfaw-show-notes .pdfaw-notes-panel { display: flex; flex-direction: column; }
 .pdfaw-notes-panel textarea { resize: none; flex: 1; margin: 0 12px 12px; padding: 12px; background: #171b20; border: 1px solid var(--pdfaw-border); color: var(--pdfaw-text); line-height: 1.6; }
-.pdfaw-footer { min-height: 30px; padding: 5px 15px; gap: 20px; border-bottom: none; border-top: 1px solid var(--pdfaw-border); font-size: 10px; color: var(--pdfaw-muted); background: #1a1e23; }
-.pdfaw-footer > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pdfaw-footer > span:first-of-type { margin-left: auto; white-space: nowrap; }
-.pdfaw-footer-help { white-space: nowrap; }
 .pdfaw-editor blockquote { margin: 0 0 20px; border-left: 3px solid var(--interactive-accent); padding: 8px 14px; max-height: 120px; overflow: auto; color: var(--text-muted); }
 .pdfaw-editor .setting-item-control { min-width: 50%; }
 .pdfaw-editor-field { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
@@ -146,8 +134,8 @@
 .pdfaw-field-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .pdfaw-field-hint { color: var(--text-muted); font-size: var(--font-ui-small, 12px); }
 .pdfaw-editor-body { width: 100%; resize: vertical; padding: 12px; line-height: 1.6; }
-@media (max-width: 1000px) { .pdfaw-footer-help { display: none; } .pdfaw-toolbar { gap: 8px; } .pdfaw-tool-group + .pdfaw-tool-group { padding-left: 8px; } }
-@media (max-width: 700px) { .pdfaw-pages { flex-basis: 128px; } .pdfaw-thumbnails { padding: 0 6px 10px; } .pdfaw-label { display: none; } .pdfaw-header { gap: 10px; padding: 8px 10px; } .pdfaw-search input { width: 130px; } .pdfaw-minimap { width: 132px; } .pdfaw-minimap .pdfaw-map { width: 114px; height: 64px; } .pdfaw-hint { display: none; } .pdfaw-notes-panel { flex-basis: 220px; } }
+@media (max-width: 1000px) { .pdfaw-toolbar { gap: 8px; } .pdfaw-tool-group + .pdfaw-tool-group { padding-left: 8px; } }
+@media (max-width: 700px) { .pdfaw-pages { flex-basis: 128px; } .pdfaw-thumbnails { padding: 0 6px 10px; } .pdfaw-search input { width: 130px; } .pdfaw-hint { display: none; } .pdfaw-notes-panel { flex-basis: 220px; } }
 
 .pdfaw-category-modal { width: min(720px, 95vw); box-sizing: border-box; }
 .pdfaw-category-modal * { box-sizing: border-box; }
@@ -168,6 +156,7 @@
 .pdfaw-root .pdfaw-filters > button { flex-shrink: 0; }
 @media (max-width: 500px) {
   .pdfaw-category-row { grid-template-columns: 24px minmax(80px, 1fr) 48px 32px; gap: 8px; }
+  .pdfaw-root .pdfaw-selection-toolbar { flex-direction: column; }
   .pdfaw-category-name { grid-column: 2 / 4; }
   .pdfaw-category-icon { grid-column: 2; grid-row: 2; }
   .pdfaw-category-color { grid-column: 3; grid-row: 2; }

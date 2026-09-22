@@ -9,7 +9,7 @@ export async function testCategories({evaluate, until, cdp}) {
   await evaluate(`window.activeFile=new TFile('Forschungspapier.pdf');plugin.ribbon[0].callback();window.activeFile=null`);
   assert.equal(await evaluate('openedState.type'),'pdfaw-view');
   assert.equal(await evaluate('plugin.tabs[0].getSettingDefinitions()[1].name'),'Categories');
-  const open = () => evaluate(`document.querySelector('button[aria-label="Manage categories"]').click()`);
+  const open = () => evaluate(`document.querySelector('button[aria-label="Customize"]').click()`);
   const click = text => evaluate(`[...document.querySelectorAll('.pdfaw-category-modal button')].find(b=>b.textContent===${JSON.stringify(text)}).click()`);
   const name = (id,value) => evaluate(`(() => { const input=document.querySelector('[data-category-id="${id}"] input[type="text"]');input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('input')); })()`);
   await open();
@@ -24,10 +24,10 @@ export async function testCategories({evaluate, until, cdp}) {
   await evaluate(`(() => {const row=document.querySelector('[data-category-id="${id}"]');const color=row.querySelector('input[type="color"]');color.value='#aa3366';color.dispatchEvent(new Event('input'));const icon=row.querySelector('select');icon.value='lightbulb';icon.dispatchEvent(new Event('change'));})()`);
   await click('Save categories'); await until('!document.querySelector(".pdfaw-category-modal")');
   assert.equal(await evaluate('categories.active().length'),7);
-  assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[title=Assertion]").dataset.icon'),'quote');
-  assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[title=Hypothesis]").dataset.icon'),'lightbulb');
+  assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[aria-label=Assertion]").dataset.icon'),'quote');
+  assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[aria-label=Hypothesis]").dataset.icon'),'lightbulb');
   assert.equal(await evaluate('(async()=> (await reloadCategories()).find(x=>x.label==="Hypothesis").hex)()'),'#aa3366');
-  await evaluate(`(() => {const span=document.querySelector('.pdfaw-textlayer span');const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);view.captureSelection();document.querySelector('.pdfaw-selection-toolbar button[title="Hypothesis"]').click();})()`);
+  await evaluate(`(() => {const span=document.querySelector('.pdfaw-textlayer span');const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);view.captureSelection();document.querySelector('.pdfaw-selection-toolbar button[aria-label="Hypothesis"]').click();})()`);
   assert.equal(await evaluate('document.querySelector(".modal select").value'),id);
   await evaluate(`(() => {const body=document.querySelector('.pdfaw-editor-body');body.value='Custom category comment';body.dispatchEvent(new Event('input'));[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click();return view.saveQueue;})()`);
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).category'),id);
@@ -40,7 +40,7 @@ export async function testCategories({evaluate, until, cdp}) {
   await open();
   await evaluate(`document.querySelector('[data-category-id="${id}"] .pdfaw-category-delete').click();document.querySelector('[data-category-id="note"] .pdfaw-category-delete').click()`);
   await click('Save categories'); await until('!document.querySelector(".pdfaw-category-modal")');
-  assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[title=Hypothesis]")'),null);
+  assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[aria-label=Hypothesis]")'),null);
   assert.equal(await evaluate('categories.preferred()'),'claim');
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).comment'),'Custom category comment');
   await evaluate('view.editAnnotation(view.sidecar.annotations.at(-1))');

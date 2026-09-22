@@ -18,7 +18,7 @@ export class RemarkSettingsTab extends PluginSettingTab {
       { name: "Open PDF", desc: "Open the active PDF or choose one from this vault.",
         render: (setting: Setting) => { setting.addButton(button => button.setButtonText("Open PDF").onClick(this.openPdf)); } },
       { name: "Categories", desc: "Edit the names, colors, and icons used across all PDFs in this vault.",
-        render: (setting: Setting) => { setting.addButton(button => button.setButtonText("Manage categories").onClick(() => new CategoryModal(this.app, this.categories).open())); } },
+        render: (setting: Setting) => { setting.addButton(button => button.setButtonText("Customize").onClick(() => new CategoryModal(this.app, this.categories).open())); } },
     ];
   }
 }

@@ -26,7 +26,7 @@ export class CommentPreview {
     this.el.empty(); this.el.hidden = false;
     const heading = this.el.createDiv({ cls: "pdfaw-preview-heading" });
     heading.createSpan({ text: annotations.length === 1 ? "Comment" : "Comments" });
-    const close = heading.createEl("button", { cls: "pdfaw-icon-button", attr: { type: "button", title: "Close preview", "aria-label": "Close preview" } });
+    const close = heading.createEl("button", { cls: "pdfaw-icon-button", attr: { type: "button", "aria-label": "Close preview" } });
     setIcon(close, "x"); close.onclick = () => this.hide();
     if (!annotations.length) this.el.createDiv({ text: "No comments on this page yet." });
     for (const annotation of annotations) {
@@ -39,10 +39,10 @@ export class CommentPreview {
       item.createDiv({ cls: "pdfaw-preview-body", text: annotation.comment?.trim() || annotation.text });
       if (annotation.tags?.length) item.createDiv({ cls: "pdfaw-preview-tags", text: annotation.tags.join(" · ") });
       const actions = item.createDiv({ cls: "pdfaw-preview-actions" });
-      const edit = actions.createEl("button", { text: "Edit", attr: { type: "button", title: "Edit comment", "aria-label": "Edit comment" } });
+      const edit = actions.createEl("button", { text: "Edit", attr: { type: "button", "aria-label": "Edit comment" } });
       setIcon(edit, "pencil");
       edit.onclick = () => { this.hide(); this.actions.edit(annotation); };
-      const remove = actions.createEl("button", { text: "Delete", attr: { type: "button", title: "Delete comment", "aria-label": "Delete comment" } });
+      const remove = actions.createEl("button", { text: "Delete", attr: { type: "button", "aria-label": "Delete comment" } });
       setIcon(remove, "trash-2");
       remove.onclick = () => {
         if (!this.win.confirm("Delete this comment?")) return;

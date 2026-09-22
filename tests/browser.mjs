@@ -178,7 +178,7 @@ try {
   await evaluate(`document.querySelector('.pdfaw-filters button:nth-child(2)').click()`);
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 1);
   await evaluate(`document.querySelector('.pdfaw-filters button').click(); view.zoomBy(1.3);`);
-  await evaluate(`(() => { const span=[...document.querySelectorAll('.pdfaw-textlayer span')].find(s=>s.textContent.includes('Gewohnheiten spielen')); const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);span.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));document.querySelector('.pdfaw-selection-toolbar button[title="Claim"]').click(); })()`);
+  await evaluate(`(() => { const span=[...document.querySelectorAll('.pdfaw-textlayer span')].find(s=>s.textContent.includes('Gewohnheiten spielen')); const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);span.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));document.querySelector('.pdfaw-selection-toolbar button[aria-label="Claim"]').click(); })()`);
   assert.equal(await evaluate('document.querySelectorAll(".modal").length'), 1);
   await evaluate(`(() => {const body=document.querySelector('.pdfaw-editor-body');body.value='Neuer Kommentar';body.dispatchEvent(new Event('input'));[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click();return view.saveQueue;})()`);
   assert.equal(await evaluate('view.sidecar.annotations.length'), 7);
@@ -256,7 +256,7 @@ try {
   const previewShot = await cdp('Page.captureScreenshot', { format: 'png' });
   await writeFile(path.join(artifacts, 'comment-preview.png'), Buffer.from(previewShot.data, 'base64'));
   const editPoint = await evaluate(`(() => {
-    const r = document.querySelector('.pdfaw-preview-actions button[title="Edit comment"]').getBoundingClientRect();
+    const r = document.querySelector('.pdfaw-preview-actions button[aria-label="Edit comment"]').getBoundingClientRect();
     return {x: r.x + r.width / 2, y: r.y + r.height / 2};
   })()`);
   await clickAt(editPoint);
@@ -279,7 +279,7 @@ try {
     const confirm = window.confirm;
     try {
       window.confirm = () => true;
-      document.querySelector('.pdfaw-preview-actions button[title="Delete comment"]').click();
+      document.querySelector('.pdfaw-preview-actions button[aria-label="Delete comment"]').click();
       window.previewClosedAfterDelete = document.querySelector('.pdfaw-comment-preview').hidden;
       document.querySelector('.pdfaw-read-comments').click();
     } finally { window.confirm = confirm; }
@@ -296,16 +296,16 @@ try {
   assert.equal(await evaluate('document.querySelector(".pdfaw-comment-preview").hidden'), true);
   assert.equal(await evaluate('document.activeElement.classList.contains("pdfaw-read-comments")'), true, 'Escape restores focus to the page-comments button');
   await evaluate('document.querySelector(".pdfaw-read-comments").click()');
-  await evaluate(`document.querySelector('.pdfaw-comment-preview button[title="Close preview"]').click()`);
+  await evaluate(`document.querySelector('.pdfaw-comment-preview button[aria-label="Close preview"]').click()`);
   assert.equal(await evaluate('document.querySelector(".pdfaw-comment-preview").hidden'), true);
   assert.equal(await evaluate('document.activeElement.classList.contains("pdfaw-read-comments")'), true, 'Close restores focus to the page-comments button');
   await evaluate(`(() => {
     document.querySelector('.pdfaw-read-comments').click();
-    document.querySelector('button[title="Toggle page sidebar"]').click();
+    document.querySelector('button[aria-label="Toggle page sidebar"]').click();
   })()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   assert.equal(await evaluate('document.querySelector(".pdfaw-comment-preview").hidden'), true, 'An actual viewport resize still dismisses the preview');
-  await evaluate(`document.querySelector('button[title="Toggle page sidebar"]').click()`);
+  await evaluate(`document.querySelector('button[aria-label="Toggle page sidebar"]').click()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   await evaluate(`(() => {
     const span=[...document.querySelectorAll('.pdfaw-textlayer span')].find(s=>s.textContent.includes('Gewohnheiten spielen'));
@@ -315,7 +315,7 @@ try {
   assert.equal(await evaluate('view.selection.text'), 'hnheiten spielen eine');
   const readingShot = await cdp('Page.captureScreenshot', { format: 'png' });
   await writeFile(path.join(artifacts, 'reading.png'), Buffer.from(readingShot.data, 'base64'));
-  await evaluate(`document.querySelector('.pdfaw-selection-toolbar button[title="Note"]').click()`);
+  await evaluate(`document.querySelector('.pdfaw-selection-toolbar button[aria-label="Note"]').click()`);
   assert.equal(await evaluate('document.querySelector(".modal").dataset.title'), 'Add comment');
   await evaluate(`(() => {const body=document.querySelector('.pdfaw-editor-body');body.value='Reading mode comment';body.dispatchEvent(new Event('input'));[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click();return view.saveQueue;})()`);
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).category'), 'note');

@@ -33,12 +33,9 @@ export class PdfAnnotatorView extends FileView {
   private pageInput!: HTMLInputElement;
   private pageTotal!: HTMLSpanElement;
   private zoomLabel!: HTMLButtonElement;
-  private titleEl!: HTMLSpanElement;
-  private mini!: SVGSVGElement;
   private mode: "canvas" | "reading" = "canvas";
   private canvasCamera: typeof this.camera | null = null;
   private modeButtons = new Map<string, HTMLButtonElement>();
-  private modeLabel!: HTMLSpanElement;
   private selectionBar!: HTMLDivElement;
   private commentPreview!: CommentPreview;
   private filterBar!: HTMLDivElement;
@@ -71,6 +68,10 @@ export class PdfAnnotatorView extends FileView {
   private selection: { page: number; text: string; quads: Quad[] } | null = null;
   private selectionPointer: number | null = null;
   private commentPress: { pointer: number; start: Point; dragged: boolean } | null = null;
+  private pageChangePending = false;
+  private selectionBarOrientation: "horizontal" | "vertical" = "horizontal";
+  private selectionBarPosition: Point | null = null;
+  private selectionDrag: { pointer: number; start: Point; origin: Point } | null = null;
   private activeId: string | null = null;
   private gesture: { pointer: number; start: Point; origin: Point; card?: Annotation; element: HTMLElement } | null = null;
   private searchPages: number[] = [];
@@ -87,21 +88,16 @@ export class PdfAnnotatorView extends FileView {
   private get win() { return this.contentEl.ownerDocument.defaultView!; }
 
   private button(parent: HTMLElement, icon: string, label: string, action: () => void, cls = ""): HTMLButtonElement {
-    const button = parent.createEl("button", { cls: `pdfaw-icon-button ${cls}`, attr: { "aria-label": label, title: label, type: "button" } });
+    const button = parent.createEl("button", { cls: `pdfaw-icon-button ${cls}`, attr: { "aria-label": label, type: "button" } });
     setIcon(button, icon); button.onclick = action;
     return button;
   }
 
   async onOpen() {
     this.contentEl.empty(); this.contentEl.addClass("pdfaw-content");
-    this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0", "aria-label": "PDF with comment canvas" } });
-    const header = this.root.createDiv({ cls: "pdfaw-header" });
-    const brand = header.createDiv({ cls: "pdfaw-brand" });
-    setIcon(brand.createSpan({ cls: "pdfaw-brand-icon" }), "file-pen-line");
-    this.titleEl = brand.createSpan({ text: "Remark My Words" });
-    this.modeLabel = brand.createSpan({ cls: "pdfaw-label", attr: { "aria-label": "Canvas mode", title: "Canvas mode" } });
-    setIcon(this.modeLabel, "layout-dashboard");
-    const search = header.createDiv({ cls: "pdfaw-search" });
+    this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0" } });
+    const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
+    const search = toolbar.createDiv({ cls: "pdfaw-search" });
     setIcon(search.createSpan(), "search");
     this.searchInput = search.createEl("input", { attr: { type: "search", placeholder: "Search document …", "aria-label": "Search document" } });
     this.searchInput.onkeydown = event => {
@@ -112,7 +108,6 @@ export class PdfAnnotatorView extends FileView {
     this.searchStatus = search.createSpan({ cls: "pdfaw-search-status" });
     this.button(search, "chevron-down", "Next matching page", () => void this.searchDocument(1));
 
-    const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
     for (const mode of ["canvas", "reading"] as const) {
       const button = this.button(modes, mode === "canvas" ? "layout-dashboard" : "book-open", mode === "canvas" ? "Canvas mode" : "Reading mode", () => this.setMode(mode));
@@ -126,7 +121,7 @@ export class PdfAnnotatorView extends FileView {
     this.button(tools, "message-square-plus", "Comment on selection", () => this.editSelection(this.categories.preferred()));
     const zoom = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-zoom-controls" });
     this.button(zoom, "minus", "Zoom out", () => this.zoomBy(1 / 1.15));
-    this.zoomLabel = zoom.createEl("button", { cls: "pdfaw-zoom-label", text: "100 %", attr: { title: "Zoom to 100%", "aria-label": "Zoom to 100 percent" } });
+    this.zoomLabel = zoom.createEl("button", { cls: "pdfaw-zoom-label", text: "100 %", attr: { "aria-label": "Zoom to 100 percent" } });
     this.zoomLabel.onclick = () => this.zoomBy(1 / this.camera.zoom);
     this.button(zoom, "plus", "Zoom in", () => this.zoomBy(1.15));
     this.button(zoom, "scan", "Fit PDF and comments", () => this.fit());
@@ -140,18 +135,11 @@ export class PdfAnnotatorView extends FileView {
     const readComments = this.button(right, "messages-square", "Read page comments", () => {
       this.commentPreview.show(this.pageAnnotations(), readComments.getBoundingClientRect(), readComments);
     }, "pdfaw-read-comments");
-    this.button(right, "tags", "Manage categories", () => new CategoryModal(this.app, this.categories).open());
+    this.button(right, "layout-dashboard", "Rearrange cards on this page", () => this.rearrangeCards());
+    this.button(right, "tags", "Customize", () => new CategoryModal(this.app, this.categories).open());
     this.button(right, "sticky-note", "Document notes", () => {
       this.root.toggleClass("pdfaw-show-notes", !this.root.hasClass("pdfaw-show-notes"));
       if (this.root.hasClass("pdfaw-show-notes")) this.noteInput.focus();
-    });
-    this.button(right, "ellipsis", "More actions", () => {
-      new Menu().addItem(item => item.setTitle("Rearrange cards on this page").setIcon("layout-dashboard").onClick(() => {
-        this.pageAnnotations().forEach((annotation, index) => { annotation.position = defaultPosition(index, this.pageWidth); });
-        this.renderAnnotations(); this.fit(); void this.save();
-      })).addItem(item => item.setTitle("Open PDF in Obsidian").setIcon("file-text").onClick(() => {
-        if (this.file) void this.leaf.setViewState({ type: "pdf", state: { file: this.file.path } });
-      })).showAtPosition(this.menuPosition(right));
     });
 
     const body = this.root.createDiv({ cls: "pdfaw-body" });
@@ -178,22 +166,6 @@ export class PdfAnnotatorView extends FileView {
     this.register(this.categories.subscribe(() => {
       this.renderCategoryTools(); this.renderFilters(); this.renderAnnotations(); this.positionSelectionBar();
     }));
-    const minimap = this.viewport.createDiv({ cls: "pdfaw-minimap" });
-    this.mini = svg(minimap, "svg", { class: "pdfaw-map", role: "img", "aria-label": "Canvas overview; click to navigate" });
-    this.mini.onclick = event => {
-      const transform = this.mini.getScreenCTM()?.inverse();
-      if (!transform) return;
-      const point = this.mini.createSVGPoint(); point.x = event.clientX; point.y = event.clientY;
-      const world = point.matrixTransform(transform);
-      this.camera.x = this.viewport.clientWidth / 2 - world.x * this.camera.zoom;
-      this.camera.y = this.viewport.clientHeight / 2 - world.y * this.camera.zoom;
-      this.applyCamera();
-    };
-    const mapTools = minimap.createDiv({ cls: "pdfaw-map-tools" });
-    this.button(mapTools, "minus", "Zoom out on canvas", () => this.zoomBy(1 / 1.15));
-    mapTools.createSpan({ text: "Overview" });
-    this.button(mapTools, "plus", "Zoom in on canvas", () => this.zoomBy(1.15));
-    this.button(mapTools, "maximize", "Fit all", () => this.fit());
     const notesPanel = body.createDiv({ cls: "pdfaw-notes-panel" });
     const notesHeading = notesPanel.createDiv({ cls: "pdfaw-panel-heading" });
     notesHeading.createSpan({ text: "Document notes" });
@@ -205,9 +177,8 @@ export class PdfAnnotatorView extends FileView {
       this.win.clearTimeout(this.notesTimer);
       this.notesTimer = this.win.setTimeout(() => { this.notesTimer = undefined; void this.save(); }, 400);
     };
-    const footer = this.root.createDiv({ cls: "pdfaw-footer" });
-    this.status = footer.createDiv(); this.saveStatus = footer.createSpan({ text: "Local to vault" });
-    footer.createSpan({ cls: "pdfaw-footer-help", text: "Drag to pan · Ctrl/⌘ + scroll to zoom" });
+    const status = this.root.createDiv({ cls: "pdfaw-status", attr: { hidden: "true", "aria-live": "polite" } });
+    this.status = status; this.saveStatus = status.createSpan({ text: "" });
     this.setTool("select");
     this.registerDomEvent(this.viewport, "pointerdown", event => this.startPan(event));
     this.registerDomEvent(this.pageEl, "pointerdown", event => {
@@ -219,6 +190,7 @@ export class PdfAnnotatorView extends FileView {
     this.registerDomEvent(this.contentEl.ownerDocument, "pointermove", event => {
       const press = this.commentPress;
       if (press?.pointer === event.pointerId && Math.hypot(event.clientX - press.start.x, event.clientY - press.start.y) > 4) press.dragged = true;
+      this.moveSelectionBarDrag(event);
     });
     this.registerDomEvent(this.pageEl, "click", event => this.openCommentAt(event));
     this.registerDomEvent(this.contentEl.ownerDocument, "pointerdown", event => {
@@ -226,6 +198,7 @@ export class PdfAnnotatorView extends FileView {
     });
     this.registerDomEvent(this.viewport, "pointerup", event => { this.endGesture(event); if (this.selectionPointer === null) this.captureSelection(); });
     this.registerDomEvent(this.contentEl.ownerDocument, "pointerup", event => {
+      this.endSelectionBarDrag(event);
       if (this.selectionPointer !== event.pointerId) return;
       this.selectionPointer = null; this.captureSelection();
     });
@@ -244,7 +217,14 @@ export class PdfAnnotatorView extends FileView {
     });
     this.registerDomEvent(this.viewport, "wheel", event => {
       if ((event.target as HTMLElement).closest(".pdfaw-comment-body")) return;
-      if (this.mode === "reading" && !event.ctrlKey && !event.metaKey) return;
+      if (this.mode === "reading" && !event.ctrlKey && !event.metaKey) {
+        const atBottom = this.viewport.scrollTop + this.viewport.clientHeight >= this.viewport.scrollHeight - 2;
+        if (event.deltaY > 0 && atBottom && this.currentPage < (this.pdf?.numPages ?? 1) && !this.pageChangePending) {
+          event.preventDefault(); this.pageChangePending = true;
+          void this.showPage(this.currentPage + 1).finally(() => { this.pageChangePending = false; });
+        }
+        return;
+      }
       event.preventDefault();
       if (event.ctrlKey || event.metaKey) this.zoomBy(Math.exp(-event.deltaY * 0.005), { x: event.clientX, y: event.clientY });
       else { this.camera.x -= event.deltaX || (event.shiftKey ? event.deltaY : 0); this.camera.y -= event.shiftKey ? 0 : event.deltaY; this.applyCamera(); }
@@ -275,7 +255,7 @@ export class PdfAnnotatorView extends FileView {
     await this.flushNotes(); this.releaseDocument();
     const generation = this.generation;
     this.file = file; this.sidecar = null;
-    this.noteInput.disabled = true; this.noteInput.value = ""; this.titleEl.setText(file.name);
+    this.noteInput.disabled = true; this.noteInput.value = "";
     this.pageEl.empty(); this.cardsEl.empty(); this.links.replaceChildren(); this.thumbnails.empty();
     this.pageEl.createDiv({ cls: "pdfaw-loading", text: "Loading PDF …" }); this.saveStatus.setText("Loading …");
     try {
@@ -313,7 +293,7 @@ export class PdfAnnotatorView extends FileView {
   }
   private releaseDocument() {
     this.commentPreview.hide();
-    this.selectionPointer = null; this.commentPress = null;
+    this.selectionPointer = null; this.commentPress = null; this.pageChangePending = false;
     this.generation++; this.pageGeneration++; this.searchGeneration++;
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
@@ -359,13 +339,13 @@ export class PdfAnnotatorView extends FileView {
   }
   private async showPage(pageNumber: number) {
     if (!this.pdf || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
-    this.currentPage = pageNumber; this.pageReady = false;
+    this.currentPage = pageNumber; this.pageReady = false; this.viewport.scrollTop = 0; this.viewport.scrollLeft = 0;
     const token = ++this.pageGeneration, generation = this.generation;
     this.pageTask?.cancel(); this.textLayer?.cancel(); this.clearSelection();
     this.pageInput.value = String(pageNumber);
     this.thumbButtons.forEach((button, page) => { button.toggleClass("is-active", page === pageNumber); button.setAttribute("aria-current", page === pageNumber ? "page" : "false"); });
     this.thumbButtons.get(pageNumber)?.scrollIntoView({ block: "nearest" });
-    this.pageEl.empty(); this.cardsEl.empty(); this.links.replaceChildren();
+    this.pageEl.empty(); this.cardsEl.empty(); this.links.replaceChildren(); this.commentPreview.hide();
     this.pageEl.createDiv({ cls: "pdfaw-loading", text: "Loading page …" });
     try {
       const page = await this.pdf.getPage(pageNumber);
@@ -423,6 +403,13 @@ export class PdfAnnotatorView extends FileView {
 
   private renderCategoryTools() {
     this.selectionBar.empty();
+    this.selectionBar.toggleClass("is-vertical", this.selectionBarOrientation === "vertical");
+    const handle = this.button(this.selectionBar, "grip", "Move category toolbar", () => {}, "pdfaw-selection-handle");
+    handle.onpointerdown = event => this.startSelectionBarDrag(event);
+    this.button(this.selectionBar, this.selectionBarOrientation === "horizontal" ? "rows-2" : "columns-2", this.selectionBarOrientation === "horizontal" ? "Switch to vertical category toolbar" : "Switch to horizontal category toolbar", () => {
+      this.selectionBarOrientation = this.selectionBarOrientation === "horizontal" ? "vertical" : "horizontal";
+      this.renderCategoryTools(); this.positionSelectionBar();
+    });
     for (const category of this.categories.active()) {
       const button = this.button(this.selectionBar, category.icon, category.label, () => this.editSelection(category.id));
       button.setCssProps({ "--category": category.hex }); button.onpointerdown = event => event.preventDefault();
@@ -461,7 +448,7 @@ export class PdfAnnotatorView extends FileView {
       card.style.setProperty("--category", category.hex);
       const position = this.position(annotation);
       card.style.left = `${position.x}px`; card.style.top = `${position.y}px`; card.toggleClass("is-active", this.activeId === annotation.id);
-      const header = card.createDiv({ cls: "pdfaw-card-header", attr: { title: "Drag to move · Use arrow keys when the card is focused" } });
+      const header = card.createDiv({ cls: "pdfaw-card-header" });
       const badge = header.createDiv({ cls: "pdfaw-badge" });
       setIcon(badge.createSpan(), category.icon); badge.createSpan({ text: category.label });
       this.button(header, "ellipsis", "Comment actions", () => this.cardMenu(annotation, header));
@@ -478,7 +465,7 @@ export class PdfAnnotatorView extends FileView {
         const tags = card.createDiv({ cls: "pdfaw-tags" }); annotation.tags.forEach(tag => tags.createSpan({ text: tag }));
       }
       const footer = card.createDiv({ cls: "pdfaw-card-footer" });
-      const jump = footer.createEl("button", { text: `↗ p. ${annotation.page}`, attr: { title: annotation.text, "aria-label": "Go to highlighted passage" } });
+      const jump = footer.createEl("button", { text: `↗ p. ${annotation.page}`, attr: { "aria-label": "Go to highlighted passage" } });
       jump.onclick = () => this.focusAnnotation(annotation);
       footer.createEl("time", { text: new Date(annotation.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short" }), attr: { datetime: new Date(annotation.updatedAt).toISOString() } });
       card.ondblclick = event => { if (!(event.target as HTMLElement).closest("button")) this.editAnnotation(annotation); };
@@ -498,6 +485,16 @@ export class PdfAnnotatorView extends FileView {
     }
     this.status.setText(`${this.file?.name ?? "PDF"}  /  Page ${this.currentPage}  ·  ${this.visibleAnnotations().length} of ${this.sidecar?.annotations.length ?? 0} annotations`);
     this.queueGeometry();
+  }
+  private rearrangeCards() {
+    let leftY = 28, rightY = 28;
+    this.pageAnnotations().forEach((annotation, index) => {
+      const card = this.cards.get(annotation.id), height = card?.offsetHeight || 220;
+      const left = index % 2 === 0;
+      annotation.position = { x: left ? -CARD_WIDTH - 90 : this.pageWidth + 90, y: left ? leftY : rightY };
+      if (left) leftY += height + 24; else rightY += height + 24;
+    });
+    this.renderAnnotations(); this.fit(); void this.save();
   }
   private cardMenu(annotation: Annotation, element: HTMLElement) {
     const menu = new Menu();
@@ -568,7 +565,8 @@ export class PdfAnnotatorView extends FileView {
     this.selection = { page: this.currentPage, text: selection.toString().trim(), quads }; this.positionSelectionBar();
   }
   private clearSelection() {
-    this.selection = null; if (this.selectionBar) this.selectionBar.hidden = true;
+    this.selection = null; this.selectionBarPosition = null; this.selectionDrag = null;
+    if (this.selectionBar) this.selectionBar.hidden = true;
     this.pageEl?.querySelector(".pdfaw-selection")?.remove();
   }
   private positionSelectionBar() {
@@ -579,11 +577,36 @@ export class PdfAnnotatorView extends FileView {
     const bottom = page.top + (q.y + q.h) * this.camera.zoom, top = page.top + q.y * this.camera.zoom;
     this.selectionBar.hidden = bottom < viewport.top || top > viewport.bottom;
     if (this.selectionBar.hidden) return;
+    this.selectionBar.style.maxWidth = `${Math.max(0, this.root.clientWidth - 16)}px`;
     const width = this.selectionBar.offsetWidth, height = this.selectionBar.offsetHeight;
+    if (this.selectionBarPosition) {
+      const maxX = Math.max(8, this.root.clientWidth - width - 8), maxY = Math.max(8, this.root.clientHeight - height - 8);
+      this.selectionBar.style.left = `${Math.max(8, Math.min(maxX, this.selectionBarPosition.x))}px`;
+      this.selectionBar.style.top = `${Math.max(8, Math.min(maxY, this.selectionBarPosition.y))}px`;
+      return;
+    }
     const left = Math.max(viewport.left + 8, Math.min(viewport.right - width - 8, page.left + q.x * this.camera.zoom));
     const y = bottom + height + 10 < viewport.bottom ? bottom + 10 : top - height - 10;
-    this.selectionBar.style.left = `${left - root.left}px`;
-    this.selectionBar.style.top = `${Math.max(viewport.top + 8, Math.min(viewport.bottom - height - 8, y)) - root.top}px`;
+    this.selectionBarPosition = { x: left - root.left, y: Math.max(viewport.top + 8, Math.min(viewport.bottom - height - 8, y)) - root.top };
+    this.selectionBar.style.left = `${this.selectionBarPosition.x}px`;
+    this.selectionBar.style.top = `${this.selectionBarPosition.y}px`;
+  }
+  private startSelectionBarDrag(event: PointerEvent) {
+    if (event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    this.selectionBarPosition ??= { x: this.selectionBar.offsetLeft, y: this.selectionBar.offsetTop };
+    this.selectionDrag = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { ...this.selectionBarPosition } };
+    this.selectionBar.setPointerCapture(event.pointerId);
+  }
+  private moveSelectionBarDrag(event: PointerEvent) {
+    const drag = this.selectionDrag; if (!drag || drag.pointer !== event.pointerId) return;
+    this.selectionBarPosition = { x: drag.origin.x + event.clientX - drag.start.x, y: drag.origin.y + event.clientY - drag.start.y };
+    this.positionSelectionBar();
+  }
+  private endSelectionBarDrag(event: PointerEvent) {
+    if (this.selectionDrag?.pointer !== event.pointerId) return;
+    if (this.selectionBar.hasPointerCapture(event.pointerId)) this.selectionBar.releasePointerCapture(event.pointerId);
+    this.selectionDrag = null;
   }
   private focusAnnotation(annotation: Annotation) {
     const q = annotation.quads[0]; this.activeId = annotation.id;
@@ -600,7 +623,7 @@ export class PdfAnnotatorView extends FileView {
     this.commentPreview.hide();
     if (this.mode === "reading") { if (!(event.target as HTMLElement).closest(".pdfaw-selection-toolbar")) this.clearSelection(); return; }
     const target = event.target as HTMLElement;
-    if (target.closest("button, input, textarea, .pdfaw-comment-card, .pdfaw-filters, .pdfaw-minimap, .pdfaw-selection-toolbar")) return;
+    if (target.closest("button, input, textarea, .pdfaw-comment-card, .pdfaw-filters, .pdfaw-selection-toolbar")) return;
     if (event.button !== 1 && (event.button !== 0 || (this.tool !== "hand" && target.closest(".pdfaw-page")))) {
       if (event.button === 0) this.clearSelection(); return;
     }
@@ -631,9 +654,6 @@ export class PdfAnnotatorView extends FileView {
     this.clearSelection(); this.win.getSelection()?.removeAllRanges();
     if (mode === "reading") this.canvasCamera = { ...this.camera };
     this.mode = mode; this.root.toggleClass("pdfaw-reading", mode === "reading");
-    setIcon(this.modeLabel, mode === "reading" ? "book-open" : "layout-dashboard");
-    this.modeLabel.setAttribute("aria-label", mode === "reading" ? "Reading mode" : "Canvas mode");
-    this.modeLabel.setAttribute("title", mode === "reading" ? "Reading mode" : "Canvas mode");
     this.modeButtons.forEach((button, key) => button.setAttribute("aria-pressed", String(key === mode)));
     this.toolButtons.get("hand")!.hidden = mode === "reading";
     this.setTool("select");
@@ -677,7 +697,7 @@ export class PdfAnnotatorView extends FileView {
   }
   private queueGeometry() {
     if (this.geometryFrame) return;
-    this.geometryFrame = this.win.requestAnimationFrame(() => { this.geometryFrame = 0; if (this.mode === "canvas") { this.drawConnections(); this.drawMinimap(); } });
+    this.geometryFrame = this.win.requestAnimationFrame(() => { this.geometryFrame = 0; if (this.mode === "canvas") this.drawConnections(); });
   }
   private drawConnections() {
     this.links.replaceChildren();
@@ -688,16 +708,6 @@ export class PdfAnnotatorView extends FileView {
       svg(this.links, "path", { d: path, stroke: color, "stroke-width": 2, "stroke-dasharray": "8 7", "stroke-linecap": "round", fill: "none", "vector-effect": "non-scaling-stroke" });
       svg(this.links, "circle", { cx: anchor.x, cy: anchor.y, r: 3, fill: color });
     }
-  }
-  private drawMinimap() {
-    this.mini.replaceChildren(); const bounds = this.bounds(), camera = this.camera;
-    this.mini.setAttribute("viewBox", `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`);
-    svg(this.mini, "rect", { x: 0, y: 0, width: this.pageWidth, height: this.pageHeight, rx: 8, fill: "#687184", opacity: 0.6 });
-    this.visibleAnnotations().forEach(annotation => {
-      const p = this.position(annotation);
-      svg(this.mini, "rect", { x: p.x, y: p.y, width: CARD_WIDTH, height: this.cards.get(annotation.id)?.offsetHeight || 220, rx: 12, fill: this.categories.forAnnotation(annotation).hex, opacity: 0.8 });
-    });
-    svg(this.mini, "rect", { x: -camera.x / camera.zoom, y: -camera.y / camera.zoom, width: this.viewport.clientWidth / camera.zoom, height: this.viewport.clientHeight / camera.zoom, fill: "#b8afff", "fill-opacity": 0.08, stroke: "#b8afff", "stroke-width": 1, "vector-effect": "non-scaling-stroke" });
   }
   private clearSearch() { this.searchGeneration++; this.searchPages = []; this.searchIndex = -1; this.searchStatus.setText(""); this.pageEl.querySelectorAll(".pdfaw-search-hit").forEach(el => el.removeClass("pdfaw-search-hit")); }
   private async searchDocument(direction: number) {
@@ -749,7 +759,7 @@ export default class RemarkMyWordsPlugin extends Plugin {
     this.categories = new CategoryStore(readCategorySettings(stored), categories => this.saveData({ categories }));
     this.registerView(VIEW_TYPE, leaf => new PdfAnnotatorView(leaf, this.categories));
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
-    this.addCommand({ id: "manage-categories", name: "Manage categories", callback: () => new CategoryModal(this.app, this.categories).open() });
+    this.addCommand({ id: "manage-categories", name: "Customize", callback: () => new CategoryModal(this.app, this.categories).open() });
     this.addRibbonIcon("file-pen-line", "Remark My Words", () => this.openPdf());
     this.addSettingTab(new RemarkSettingsTab(this.app, this, this.categories, () => this.openPdf()));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {

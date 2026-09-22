@@ -13,7 +13,7 @@ export class CategoryModal extends Modal {
     super(app); this.draft = store.all(); this.revision = store.revision;
   }
   onOpen() {
-    this.setTitle("Manage categories");
+    this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
     this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
