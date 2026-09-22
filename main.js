@@ -22744,11 +22744,13 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.registerDomEvent(this.viewport, "wheel", (event) => {
       if (event.target.closest(".pdfaw-comment-body")) return;
       if (this.mode === "reading" && !event.ctrlKey && !event.metaKey) {
+        const atTop = this.viewport.scrollTop <= 2;
         const atBottom = this.viewport.scrollTop + this.viewport.clientHeight >= this.viewport.scrollHeight - 2;
-        if (event.deltaY > 0 && atBottom && this.currentPage < (this.pdf?.numPages ?? 1) && !this.pageChangePending) {
+        const nextPage = event.deltaY > 0 && atBottom ? this.currentPage + 1 : event.deltaY < 0 && atTop ? this.currentPage - 1 : null;
+        if (nextPage !== null && nextPage >= 1 && nextPage <= (this.pdf?.numPages ?? 1) && !this.pageChangePending) {
           event.preventDefault();
           this.pageChangePending = true;
-          void this.showPage(this.currentPage + 1).finally(() => {
+          void this.showPage(nextPage).finally(() => {
             this.pageChangePending = false;
           });
         }

@@ -199,6 +199,12 @@ try {
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pdfaw-cards')).display`), 'none');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pdfaw-viewport')).overflowY`), 'auto');
   assert.equal(await evaluate(`document.querySelector('.pdfaw-hint')`), null);
+  await evaluate('view.viewport.scrollTop = view.viewport.scrollHeight; view.viewport.dispatchEvent(new WheelEvent("wheel",{deltaY:700,bubbles:true,cancelable:true}))');
+  await until('view.currentPage === 2 && view.pageReady');
+  assert.equal(await evaluate('view.viewport.scrollTop'), 0, 'Scrolling past the bottom opens the next page at the top');
+  await evaluate('view.viewport.scrollTop = 0; view.viewport.dispatchEvent(new WheelEvent("wheel",{deltaY:-700,bubbles:true,cancelable:true}))');
+  await until('view.currentPage === 1 && view.pageReady');
+  assert.equal(await evaluate('view.viewport.scrollTop'), 0, 'Scrolling past the top opens the previous page at the top');
   await evaluate('view.viewport.scrollTop = 180');
   const scrollBefore = await evaluate('view.viewport.scrollTop');
   assert.ok(scrollBefore > 0, 'Reading mode scrolls naturally');
