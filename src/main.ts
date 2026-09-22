@@ -5,7 +5,7 @@ import { Annotation, Bounds, CARD_WIDTH, Category, PDF_SCALE, Point, Quad, Sidec
 import { CommentDraft, CommentModal } from "./editor";
 import { selectionQuads } from "./selection";
 import { CommentPreview } from "./comment-preview";
-import { CategoryStore, readAccentColor, readCategorySettings } from "./category-store";
+import { CategoryStore, readCategorySettings, readThemeColors } from "./category-store";
 import { CategoryModal } from "./category-modal";
 import { PdfPicker, RemarkSettingsTab } from "./plugin-access";
 import workerSource from "embedded-pdf-worker";
@@ -90,7 +90,7 @@ export class PdfAnnotatorView extends FileView {
   async onOpen() {
     this.contentEl.empty(); this.contentEl.addClass("pdfaw-content");
     this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0" } });
-    this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
+    this.applyTheme();
     const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
 
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
@@ -147,7 +147,7 @@ export class PdfAnnotatorView extends FileView {
     );
     this.renderCategoryTools();
     this.register(this.categories.subscribe(() => {
-      this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
+      this.applyTheme();
       this.renderCategoryTools(); this.renderFilters(); this.renderAnnotations(); this.positionSelectionBar();
     }));
     const notesPanel = body.createDiv({ cls: "pdfaw-notes-panel" });
@@ -233,6 +233,13 @@ export class PdfAnnotatorView extends FileView {
   }
 
   private menuPosition(el: HTMLElement) { const box = el.getBoundingClientRect(); return { x: box.left, y: box.bottom }; }
+  private applyTheme() {
+    const theme = this.categories.themeColors();
+    this.root.setCssProps({
+      "--pdfaw-bg": theme.background, "--pdfaw-panel": theme.panel, "--pdfaw-border": theme.border,
+      "--pdfaw-text": theme.text, "--pdfaw-muted": theme.muted, "--pdfaw-accent": theme.accent,
+    });
+  }
 
   async onLoadFile(file: TFile) {
     if (!this.root) await this.onOpen();
@@ -710,7 +717,7 @@ export default class RemarkMyWordsPlugin extends Plugin {
   private categories!: CategoryStore;
   async onload() {
     const stored: unknown = await this.loadData();
-    this.categories = new CategoryStore(readCategorySettings(stored), (categories, accentColor) => this.saveData({ categories, accentColor }), readAccentColor(stored));
+    this.categories = new CategoryStore(readCategorySettings(stored), (categories, theme) => this.saveData({ categories, theme }), readThemeColors(stored));
     this.registerView(VIEW_TYPE, leaf => new PdfAnnotatorView(leaf, this.categories));
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
     this.addCommand({ id: "manage-categories", name: "Customize", callback: () => new CategoryModal(this.app, this.categories).open() });

@@ -45,10 +45,12 @@ Navigate pages with thumbnails, arrows, or the page number.
 
 ## Customize
 
-Click **Customize** in the PDF toolbar. The same
-manager is available from **Settings > Remark My Words** and the command palette.
-Add a category, change its name, color, or icon, or delete it; then choose
-**Save categories**. **Cancel** leaves the previous settings unchanged.
+Click **Customize** in the PDF toolbar. The same manager is available from
+**Settings > Remark My Words** and the command palette. Choose the plugin
+interface colors for the background, panels, borders, text, secondary text, and
+accent states. You can also add a category, change its name, color, or icon, or
+delete it; then choose **Save categories**. **Cancel** leaves the previous
+settings unchanged.
 
 The initial categories remain **Claim, Evidence, Method, Concept, Limitation,
 and Note**. Changes apply across PDFs in this vault and survive restarting

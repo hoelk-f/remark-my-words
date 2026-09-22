@@ -1,7 +1,13 @@
 ﻿import { Annotation, CATEGORIES, Category, CategoryDefinition, CategoryStyle, categoryKey, categoryStyle, defaultCategoryStyle } from "./model";
 
 export const CATEGORY_ICONS: Record<string, string> = { "quote": "Quote", "check-check": "Check marks", "settings-2": "Sliders", "book-open": "Book", "circle-alert": "Alert", "sticky-note": "Note", "tag": "Tag", "star": "Star", "bookmark": "Bookmark", "lightbulb": "Idea" };
-export const DEFAULT_ACCENT = "#55d8c8";
+export type ThemeColors = { background: string; panel: string; border: string; text: string; muted: string; accent: string };
+export const DEFAULT_THEME: ThemeColors = { background: "#101513", panel: "#141a18", border: "#1b4540", text: "#e7efed", muted: "#91a19e", accent: "#55d8c8" };
+export const DEFAULT_ACCENT = DEFAULT_THEME.accent;
+export const THEME_COLORS: Array<{ key: keyof ThemeColors; label: string }> = [
+  { key: "background", label: "Background" }, { key: "panel", label: "Panels" }, { key: "border", label: "Borders" },
+  { key: "text", label: "Text" }, { key: "muted", label: "Secondary text" }, { key: "accent", label: "Accent" },
+];
 const isAccent = (value: unknown): value is string => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 export const defaultCategories = (): CategoryDefinition[] => Object.entries(CATEGORIES).map(([id, style]) => ({ id: id as Category, ...style }));
 
@@ -31,9 +37,14 @@ export function readCategorySettings(raw: unknown): CategoryDefinition[] {
 }
 
 export function readAccentColor(raw: unknown): string {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return DEFAULT_ACCENT;
-  const data = raw as Record<string, unknown>;
-  return isAccent(data.accentColor) ? data.accentColor : DEFAULT_ACCENT;
+  return readThemeColors(raw).accent;
+}
+
+export function readThemeColors(raw: unknown): ThemeColors {
+  const data = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  const saved = typeof data.theme === "object" && data.theme !== null && !Array.isArray(data.theme) ? data.theme as Record<string, unknown> : {};
+  const legacyAccent = isAccent(data.accentColor) ? data.accentColor : DEFAULT_ACCENT;
+  return Object.fromEntries(THEME_COLORS.map(({ key }) => [key, isAccent(saved[key]) ? saved[key] : key === "accent" ? legacyAccent : DEFAULT_THEME[key]])) as ThemeColors;
 }
 
 /** Shared by all PDF views in one vault. Archived definitions keep old comments readable. */
@@ -42,10 +53,12 @@ export class CategoryStore {
   private listeners = new Set<() => void>();
   private saving = false;
   revision = 0;
-  constructor(definitions = defaultCategories(), private persist: (items: CategoryDefinition[], accentColor?: string) => Promise<void> = () => Promise.resolve(), private accent = DEFAULT_ACCENT) {
+  constructor(definitions = defaultCategories(), private persist: (items: CategoryDefinition[], theme?: ThemeColors) => Promise<void> = () => Promise.resolve(), private theme: ThemeColors = { ...DEFAULT_THEME }) {
     this.definitions = validateCategories(definitions);
+    this.theme = readThemeColors({ theme });
   }
-  accentColor() { return this.accent; }
+  accentColor() { return this.theme.accent; }
+  themeColors() { return { ...this.theme }; }
   all() { return this.definitions.map(item => ({ ...item })); }
   active() { return this.all().filter(item => !item.archived); }
   preferred(): Category { return this.active().find(item => item.id === "note")?.id ?? this.active()[0].id; }
@@ -60,14 +73,15 @@ export class CategoryStore {
     return active;
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
-  async save(definitions: CategoryDefinition[], expectedRevision: number, accentColor = this.accent) {
+  async save(definitions: CategoryDefinition[], expectedRevision: number, theme = this.theme) {
     if (this.saving || expectedRevision !== this.revision) throw new Error("Categories changed in another window. Close this dialog and open it again.");
-    if (!isAccent(accentColor)) throw new Error("Choose a valid accent color.");
+    const nextTheme = readThemeColors({ theme });
+    if (THEME_COLORS.some(({ key }) => !isAccent(nextTheme[key]))) throw new Error("Choose valid theme colors.");
     const next = validateCategories(definitions);
     this.saving = true;
     try {
-      await this.persist(next, accentColor);
-      this.definitions = next; this.accent = accentColor; this.revision++;
+      await this.persist(next, nextTheme);
+      this.definitions = next; this.theme = nextTheme; this.revision++;
       this.listeners.forEach(listener => listener());
     } finally { this.saving = false; }
   }

@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.2.9 — 2026-09-22
+## 0.2.10 — 2026-09-22
 
 - See the GitHub release notes for the included changes.
+
+## 0.2.9 — 2026-09-22
+
+- Remove the document search bar and Pages heading; let Customize control the full plugin color theme.
 
 ## 0.2.8 — 2026-09-22
 
@@ -65,4 +69,3 @@
 - Backward-compatible sidecar loading and legacy category migration.
 - Bundle the PDF.js worker so installation needs only three release files.
 - Add reproducible builds, CI, release validation, and one-command release automation.
-

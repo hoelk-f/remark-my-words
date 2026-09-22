@@ -22264,7 +22264,16 @@ var CommentPreview = class {
 
 // src/category-store.ts
 var CATEGORY_ICONS = { "quote": "Quote", "check-check": "Check marks", "settings-2": "Sliders", "book-open": "Book", "circle-alert": "Alert", "sticky-note": "Note", "tag": "Tag", "star": "Star", "bookmark": "Bookmark", "lightbulb": "Idea" };
-var DEFAULT_ACCENT = "#55d8c8";
+var DEFAULT_THEME = { background: "#101513", panel: "#141a18", border: "#1b4540", text: "#e7efed", muted: "#91a19e", accent: "#55d8c8" };
+var DEFAULT_ACCENT = DEFAULT_THEME.accent;
+var THEME_COLORS = [
+  { key: "background", label: "Background" },
+  { key: "panel", label: "Panels" },
+  { key: "border", label: "Borders" },
+  { key: "text", label: "Text" },
+  { key: "muted", label: "Secondary text" },
+  { key: "accent", label: "Accent" }
+];
 var isAccent = (value) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 var defaultCategories = () => Object.entries(CATEGORIES).map(([id, style]) => ({ id, ...style }));
 function validateCategories(value) {
@@ -22289,22 +22298,27 @@ function readCategorySettings(raw) {
   if (!("categories" in raw)) return defaultCategories();
   return validateCategories(raw.categories);
 }
-function readAccentColor(raw) {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return DEFAULT_ACCENT;
-  const data = raw;
-  return isAccent(data.accentColor) ? data.accentColor : DEFAULT_ACCENT;
+function readThemeColors(raw) {
+  const data = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw : {};
+  const saved = typeof data.theme === "object" && data.theme !== null && !Array.isArray(data.theme) ? data.theme : {};
+  const legacyAccent = isAccent(data.accentColor) ? data.accentColor : DEFAULT_ACCENT;
+  return Object.fromEntries(THEME_COLORS.map(({ key }) => [key, isAccent(saved[key]) ? saved[key] : key === "accent" ? legacyAccent : DEFAULT_THEME[key]]));
 }
 var CategoryStore = class {
-  constructor(definitions = defaultCategories(), persist = () => Promise.resolve(), accent = DEFAULT_ACCENT) {
+  constructor(definitions = defaultCategories(), persist = () => Promise.resolve(), theme = { ...DEFAULT_THEME }) {
     this.persist = persist;
-    this.accent = accent;
+    this.theme = theme;
     this.listeners = /* @__PURE__ */ new Set();
     this.saving = false;
     this.revision = 0;
     this.definitions = validateCategories(definitions);
+    this.theme = readThemeColors({ theme });
   }
   accentColor() {
-    return this.accent;
+    return this.theme.accent;
+  }
+  themeColors() {
+    return { ...this.theme };
   }
   all() {
     return this.definitions.map((item) => ({ ...item }));
@@ -22333,15 +22347,16 @@ var CategoryStore = class {
       this.listeners.delete(listener);
     };
   }
-  async save(definitions, expectedRevision, accentColor = this.accent) {
+  async save(definitions, expectedRevision, theme = this.theme) {
     if (this.saving || expectedRevision !== this.revision) throw new Error("Categories changed in another window. Close this dialog and open it again.");
-    if (!isAccent(accentColor)) throw new Error("Choose a valid accent color.");
+    const nextTheme = readThemeColors({ theme });
+    if (THEME_COLORS.some(({ key }) => !isAccent(nextTheme[key]))) throw new Error("Choose valid theme colors.");
     const next = validateCategories(definitions);
     this.saving = true;
     try {
-      await this.persist(next, accentColor);
+      await this.persist(next, nextTheme);
       this.definitions = next;
-      this.accent = accentColor;
+      this.theme = nextTheme;
       this.revision++;
       this.listeners.forEach((listener) => listener());
     } finally {
@@ -22359,19 +22374,25 @@ var CategoryModal = class extends import_obsidian3.Modal {
     this.saving = false;
     this.draft = store.all();
     this.revision = store.revision;
-    this.accentColor = store.accentColor();
+    this.theme = store.themeColors();
   }
   onOpen() {
     this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
-    const accent = this.contentEl.createDiv({ cls: "pdfaw-accent-setting" });
-    accent.createEl("label", { text: "Accent color", attr: { for: "pdfaw-accent-color" } });
-    this.accentInput = accent.createEl("input", { attr: { id: "pdfaw-accent-color", type: "color", "aria-label": "Accent color" } });
-    this.accentInput.value = this.accentColor;
-    this.accentInput.oninput = () => {
-      this.accentColor = this.accentInput.value;
-    };
+    const theme = this.contentEl.createDiv({ cls: "pdfaw-theme-settings" });
+    theme.createEl("h3", { text: "Colors" });
+    theme.createEl("p", { cls: "pdfaw-category-help", text: "Choose the colors used by the plugin interface. Category colors are configured separately below." });
+    for (const { key, label } of THEME_COLORS) {
+      const field = theme.createDiv({ cls: "pdfaw-theme-field" });
+      const inputId = `pdfaw-theme-${key}`;
+      field.createEl("label", { text: label, attr: { for: inputId } });
+      const picker = field.createEl("input", { attr: { id: inputId, type: "color", "aria-label": label } });
+      picker.value = this.theme[key];
+      picker.oninput = () => {
+        this.theme[key] = picker.value;
+      };
+    }
     this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
     this.add = this.contentEl.createEl("button", { text: "Add category", attr: { type: "button" } });
@@ -22452,7 +22473,7 @@ var CategoryModal = class extends import_obsidian3.Modal {
       el.disabled = true;
     });
     try {
-      await this.store.save(this.draft, this.revision, this.accentColor);
+      await this.store.save(this.draft, this.revision, this.theme);
       this.close();
     } catch (error) {
       this.error.setText(error instanceof Error ? error.message : "Could not save categories. Try again.");
@@ -22592,7 +22613,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.contentEl.empty();
     this.contentEl.addClass("pdfaw-content");
     this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0" } });
-    this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
+    this.applyTheme();
     const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
     for (const mode of ["canvas", "reading"]) {
@@ -22651,7 +22672,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     );
     this.renderCategoryTools();
     this.register(this.categories.subscribe(() => {
-      this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
+      this.applyTheme();
       this.renderCategoryTools();
       this.renderFilters();
       this.renderAnnotations();
@@ -22761,6 +22782,17 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
   menuPosition(el) {
     const box = el.getBoundingClientRect();
     return { x: box.left, y: box.bottom };
+  }
+  applyTheme() {
+    const theme = this.categories.themeColors();
+    this.root.setCssProps({
+      "--pdfaw-bg": theme.background,
+      "--pdfaw-panel": theme.panel,
+      "--pdfaw-border": theme.border,
+      "--pdfaw-text": theme.text,
+      "--pdfaw-muted": theme.muted,
+      "--pdfaw-accent": theme.accent
+    });
   }
   async onLoadFile(file) {
     if (!this.root) await this.onOpen();
@@ -23447,7 +23479,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
 var RemarkMyWordsPlugin = class extends import_obsidian5.Plugin {
   async onload() {
     const stored = await this.loadData();
-    this.categories = new CategoryStore(readCategorySettings(stored), (categories, accentColor) => this.saveData({ categories, accentColor }), readAccentColor(stored));
+    this.categories = new CategoryStore(readCategorySettings(stored), (categories, theme) => this.saveData({ categories, theme }), readThemeColors(stored));
     this.registerView(VIEW_TYPE, (leaf) => new PdfAnnotatorView(leaf, this.categories));
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
     this.addCommand({ id: "manage-categories", name: "Customize", callback: () => new CategoryModal(this.app, this.categories).open() });

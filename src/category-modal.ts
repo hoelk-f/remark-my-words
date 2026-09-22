@@ -1,6 +1,6 @@
 ﻿import { App, Modal, setIcon } from "obsidian";
 import { CategoryDefinition } from "./model";
-import { CATEGORY_ICONS, CategoryStore } from "./category-store";
+import { CATEGORY_ICONS, CategoryStore, THEME_COLORS, ThemeColors } from "./category-store";
 
 export class CategoryModal extends Modal {
   private draft: CategoryDefinition[];
@@ -8,20 +8,25 @@ export class CategoryModal extends Modal {
   private list!: HTMLDivElement;
   private error!: HTMLDivElement;
   private add!: HTMLButtonElement;
-  private accentInput!: HTMLInputElement;
-  private accentColor: string;
+  private theme: ThemeColors;
   private saving = false;
   constructor(app: App, private store: CategoryStore) {
-    super(app); this.draft = store.all(); this.revision = store.revision; this.accentColor = store.accentColor();
+    super(app); this.draft = store.all(); this.revision = store.revision; this.theme = store.themeColors();
   }
   onOpen() {
     this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
-    const accent = this.contentEl.createDiv({ cls: "pdfaw-accent-setting" });
-    accent.createEl("label", { text: "Accent color", attr: { for: "pdfaw-accent-color" } });
-    this.accentInput = accent.createEl("input", { attr: { id: "pdfaw-accent-color", type: "color", "aria-label": "Accent color" } });
-    this.accentInput.value = this.accentColor; this.accentInput.oninput = () => { this.accentColor = this.accentInput.value; };
+    const theme = this.contentEl.createDiv({ cls: "pdfaw-theme-settings" });
+    theme.createEl("h3", { text: "Colors" });
+    theme.createEl("p", { cls: "pdfaw-category-help", text: "Choose the colors used by the plugin interface. Category colors are configured separately below." });
+    for (const { key, label } of THEME_COLORS) {
+      const field = theme.createDiv({ cls: "pdfaw-theme-field" });
+      const inputId = `pdfaw-theme-${key}`;
+      field.createEl("label", { text: label, attr: { for: inputId } });
+      const picker = field.createEl("input", { attr: { id: inputId, type: "color", "aria-label": label } });
+      picker.value = this.theme[key]; picker.oninput = () => { this.theme[key] = picker.value; };
+    }
     this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
     this.add = this.contentEl.createEl("button", { text: "Add category", attr: { type: "button" } });
@@ -80,7 +85,7 @@ export class CategoryModal extends Modal {
     }
     this.error.setText(""); this.saving = true;
     this.contentEl.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>("input, button, select").forEach(el => { el.disabled = true; });
-    try { await this.store.save(this.draft, this.revision, this.accentColor); this.close(); }
+    try { await this.store.save(this.draft, this.revision, this.theme); this.close(); }
     catch (error) {
       this.error.setText(error instanceof Error ? error.message : "Could not save categories. Try again.");
       this.contentEl.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>("input, button, select").forEach(el => { el.disabled = false; });
