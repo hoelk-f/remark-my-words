@@ -1,7 +1,7 @@
 {
   "id": "remark-my-words",
   "name": "Remark My Words",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "minAppVersion": "1.13.7",
   "description": "Read and annotate PDFs with categorized comments, a focused reading mode, and a visual canvas for connected notes.",
   "author": "Florian Hölken",

@@ -121,7 +121,7 @@ export class PdfAnnotatorView extends FileView {
       this.commentPreview.show(this.pageAnnotations(), readComments.getBoundingClientRect(), readComments);
     }, "pdfaw-read-comments");
     this.button(right, "layout-dashboard", "Rearrange cards on this page", () => this.rearrangeCards());
-    this.button(right, "tags", "Customize", () => new CategoryModal(this.app, this.categories).open());
+    this.button(right, "settings", "Customize", () => new CategoryModal(this.app, this.categories).open());
     this.button(right, "sticky-note", "Document notes", () => {
       this.root.toggleClass("pdfaw-show-notes", !this.root.hasClass("pdfaw-show-notes"));
       if (this.root.hasClass("pdfaw-show-notes")) this.noteInput.focus();

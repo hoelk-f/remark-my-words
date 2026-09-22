@@ -2,7 +2,7 @@
 
 export const CATEGORY_ICONS: Record<string, string> = { "quote": "Quote", "check-check": "Check marks", "settings-2": "Sliders", "book-open": "Book", "circle-alert": "Alert", "sticky-note": "Note", "tag": "Tag", "star": "Star", "bookmark": "Bookmark", "lightbulb": "Idea" };
 export type ThemeColors = { background: string; panel: string; border: string; text: string; muted: string; accent: string };
-export const DEFAULT_THEME: ThemeColors = { background: "#101513", panel: "#141a18", border: "#1b4540", text: "#e7efed", muted: "#91a19e", accent: "#55d8c8" };
+export const DEFAULT_THEME: ThemeColors = { background: "#282828", panel: "#1e1e1e", border: "#3c3c3c", text: "#ffffff", muted: "#ffffff", accent: "#960000" };
 export const DEFAULT_ACCENT = DEFAULT_THEME.accent;
 export const THEME_COLORS: Array<{ key: keyof ThemeColors; label: string }> = [
   { key: "background", label: "Background" }, { key: "panel", label: "Panels" }, { key: "border", label: "Borders" },

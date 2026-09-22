@@ -22264,7 +22264,7 @@ var CommentPreview = class {
 
 // src/category-store.ts
 var CATEGORY_ICONS = { "quote": "Quote", "check-check": "Check marks", "settings-2": "Sliders", "book-open": "Book", "circle-alert": "Alert", "sticky-note": "Note", "tag": "Tag", "star": "Star", "bookmark": "Bookmark", "lightbulb": "Idea" };
-var DEFAULT_THEME = { background: "#101513", panel: "#141a18", border: "#1b4540", text: "#e7efed", muted: "#91a19e", accent: "#55d8c8" };
+var DEFAULT_THEME = { background: "#282828", panel: "#1e1e1e", border: "#3c3c3c", text: "#ffffff", muted: "#ffffff", accent: "#960000" };
 var DEFAULT_ACCENT = DEFAULT_THEME.accent;
 var THEME_COLORS = [
   { key: "background", label: "Background" },
@@ -22393,9 +22393,12 @@ var CategoryModal = class extends import_obsidian3.Modal {
         this.theme[key] = picker.value;
       };
     }
-    this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
+    const categories = this.contentEl.createDiv({ cls: "pdfaw-category-settings" });
+    categories.createEl("h3", { text: "Categories" });
+    categories.createEl("p", { cls: "pdfaw-category-help", text: "Create, edit, or remove the categories used for comments." });
+    this.list = categories.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
-    this.add = this.contentEl.createEl("button", { text: "Add category", attr: { type: "button" } });
+    this.add = categories.createEl("button", { text: "Add category", attr: { type: "button" } });
     this.add.onclick = () => {
       if (this.saving) return;
       const item = { id: `custom-${crypto.randomUUID()}`, label: "", color: "#54b5ff", hex: "#54b5ff", icon: "tag" };
@@ -22406,7 +22409,7 @@ var CategoryModal = class extends import_obsidian3.Modal {
     const actions = this.contentEl.createDiv({ cls: "pdfaw-category-actions" });
     const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
     cancel.onclick = () => this.close();
-    const save = actions.createEl("button", { text: "Save categories", cls: "mod-cta", attr: { type: "button" } });
+    const save = actions.createEl("button", { text: "Save", cls: "mod-cta", attr: { type: "button" } });
     save.onclick = () => {
       void this.save();
     };
@@ -22647,7 +22650,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.commentPreview.show(this.pageAnnotations(), readComments.getBoundingClientRect(), readComments);
     }, "pdfaw-read-comments");
     this.button(right, "layout-dashboard", "Rearrange cards on this page", () => this.rearrangeCards());
-    this.button(right, "tags", "Customize", () => new CategoryModal(this.app, this.categories).open());
+    this.button(right, "settings", "Customize", () => new CategoryModal(this.app, this.categories).open());
     this.button(right, "sticky-note", "Document notes", () => {
       this.root.toggleClass("pdfaw-show-notes", !this.root.hasClass("pdfaw-show-notes"));
       if (this.root.hasClass("pdfaw-show-notes")) this.noteInput.focus();

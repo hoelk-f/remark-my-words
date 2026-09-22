@@ -1,8 +1,8 @@
 .workspace-leaf-content .view-content.pdfaw-content, .pdfaw-content.pdfaw-content { padding: 0; overflow: hidden; }
 .pdfaw-root {
   position: relative;
-  --pdfaw-bg: #101513; --pdfaw-panel: #141a18; --pdfaw-border: #1b4540;
-  --pdfaw-text: #e7efed; --pdfaw-muted: #91a19e; --pdfaw-accent: #55d8c8;
+  --pdfaw-bg: #282828; --pdfaw-panel: #1e1e1e; --pdfaw-border: #3c3c3c;
+  --pdfaw-text: #ffffff; --pdfaw-muted: #ffffff; --pdfaw-accent: #960000;
   display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 260px;
   overflow: hidden; background: var(--pdfaw-bg); color: var(--pdfaw-text);
   font: 13px/1.5 var(--font-interface); color-scheme: dark;
@@ -139,7 +139,10 @@
 .pdfaw-theme-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; }
 .pdfaw-theme-field label { color: var(--text-muted); }
 .pdfaw-theme-field input[type="color"] { width: 42px; min-height: 30px; padding: 2px; }
-.pdfaw-category-list { max-height: 55vh; overflow-y: auto; padding: 2px; }
+.pdfaw-category-settings { margin: 16px 0 20px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+.pdfaw-category-settings h3 { margin: 0 0 4px; }
+.pdfaw-category-settings > p { margin: 0 0 10px; }
+.pdfaw-category-list { padding: 2px; }
 .pdfaw-category-row { display: grid; grid-template-columns: 24px minmax(100px, 1fr) 56px minmax(100px, 140px) 32px; gap: 12px; align-items: end; padding: 14px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .pdfaw-category-row label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: var(--font-ui-small); }
 .pdfaw-category-row input[type="text"], .pdfaw-category-row select { width: 100%; min-width: 0; }

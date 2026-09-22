@@ -14,7 +14,7 @@ export async function testCategories({evaluate, until, cdp}) {
   const name = (id,value) => evaluate(`(() => { const input=document.querySelector('[data-category-id="${id}"] input[type="text"]');input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('input')); })()`);
   await open();
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-category-row").length'),6);
-  assert.equal(await evaluate('document.querySelector("#pdfaw-theme-accent").value'),'#55d8c8');
+  assert.equal(await evaluate('document.querySelector("#pdfaw-theme-accent").value'),'#960000');
   await name('claim','Discard this'); await click('Cancel');
   assert.equal(await evaluate('categories.style("claim").label'),'Claim','Cancel leaves categories unchanged');
   await open(); await name('claim','Assertion');
@@ -25,7 +25,7 @@ export async function testCategories({evaluate, until, cdp}) {
   const id=await evaluate('document.querySelector(".pdfaw-category-row:last-child").dataset.categoryId');
   await name(id,'Hypothesis');
   await evaluate(`(() => {const row=document.querySelector('[data-category-id="${id}"]');const color=row.querySelector('input[type="color"]');color.value='#aa3366';color.dispatchEvent(new Event('input'));const icon=row.querySelector('select');icon.value='lightbulb';icon.dispatchEvent(new Event('change'));})()`);
-  await click('Save categories'); await until('!document.querySelector(".pdfaw-category-modal")');
+  await click('Save'); await until('!document.querySelector(".pdfaw-category-modal")');
   assert.equal(await evaluate('categories.active().length'),7);
   assert.equal(await evaluate('categories.accentColor()'),'#b54cff');
   assert.equal(await evaluate('categories.themeColors().background'),'#0b0f0e');
@@ -47,7 +47,7 @@ export async function testCategories({evaluate, until, cdp}) {
   await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:941,deviceScaleFactor:1,mobile:false});
   await open();
   await evaluate(`document.querySelector('[data-category-id="${id}"] .pdfaw-category-delete').click();document.querySelector('[data-category-id="note"] .pdfaw-category-delete').click()`);
-  await click('Save categories'); await until('!document.querySelector(".pdfaw-category-modal")');
+  await click('Save'); await until('!document.querySelector(".pdfaw-category-modal")');
   assert.equal(await evaluate('document.querySelector(".pdfaw-selection-toolbar button[aria-label=Hypothesis]")'),null);
   assert.equal(await evaluate('categories.preferred()'),'claim');
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).comment'),'Custom category comment');
@@ -57,10 +57,10 @@ export async function testCategories({evaluate, until, cdp}) {
   await evaluate(`view.onLoadFile(new TFile('Forschungspapier.pdf'))`);
   assert.equal(await evaluate('categories.forAnnotation(view.sidecar.annotations.at(-1)).label'),'Hypothesis');
   await open();await name('claim','Renamed after disk failure');
-  await evaluate('window.failSettingsSave=true');await click('Save categories');
+  await evaluate('window.failSettingsSave=true');await click('Save');
   await until('document.querySelector(".pdfaw-category-error").textContent.includes("Disk unavailable")');
   assert.equal(await evaluate('categories.style("claim").label'),'Assertion');
-  await evaluate('window.failSettingsSave=false');await click('Save categories');
+  await evaluate('window.failSettingsSave=false');await click('Save');
   await until('!document.querySelector(".pdfaw-category-modal")');
   assert.equal(await evaluate('categories.style("claim").label'),'Renamed after disk failure');
   await open();

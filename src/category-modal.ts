@@ -27,9 +27,12 @@ export class CategoryModal extends Modal {
       const picker = field.createEl("input", { attr: { id: inputId, type: "color", "aria-label": label } });
       picker.value = this.theme[key]; picker.oninput = () => { this.theme[key] = picker.value; };
     }
-    this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
+    const categories = this.contentEl.createDiv({ cls: "pdfaw-category-settings" });
+    categories.createEl("h3", { text: "Categories" });
+    categories.createEl("p", { cls: "pdfaw-category-help", text: "Create, edit, or remove the categories used for comments." });
+    this.list = categories.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
-    this.add = this.contentEl.createEl("button", { text: "Add category", attr: { type: "button" } });
+    this.add = categories.createEl("button", { text: "Add category", attr: { type: "button" } });
     this.add.onclick = () => {
       if (this.saving) return;
       const item: CategoryDefinition = { id: `custom-${crypto.randomUUID()}`, label: "", color: "#54b5ff", hex: "#54b5ff", icon: "tag" };
@@ -39,7 +42,7 @@ export class CategoryModal extends Modal {
     const actions = this.contentEl.createDiv({ cls: "pdfaw-category-actions" });
     const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
     cancel.onclick = () => this.close();
-    const save = actions.createEl("button", { text: "Save categories", cls: "mod-cta", attr: { type: "button" } });
+    const save = actions.createEl("button", { text: "Save", cls: "mod-cta", attr: { type: "button" } });
     save.onclick = () => { void this.save(); };
     this.render();
   }
