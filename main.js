@@ -22264,6 +22264,8 @@ var CommentPreview = class {
 
 // src/category-store.ts
 var CATEGORY_ICONS = { "quote": "Quote", "check-check": "Check marks", "settings-2": "Sliders", "book-open": "Book", "circle-alert": "Alert", "sticky-note": "Note", "tag": "Tag", "star": "Star", "bookmark": "Bookmark", "lightbulb": "Idea" };
+var DEFAULT_ACCENT = "#55d8c8";
+var isAccent = (value) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 var defaultCategories = () => Object.entries(CATEGORIES).map(([id, style]) => ({ id, ...style }));
 function validateCategories(value) {
   if (!Array.isArray(value)) throw new Error("Invalid category settings.");
@@ -22287,13 +22289,22 @@ function readCategorySettings(raw) {
   if (!("categories" in raw)) return defaultCategories();
   return validateCategories(raw.categories);
 }
+function readAccentColor(raw) {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return DEFAULT_ACCENT;
+  const data = raw;
+  return isAccent(data.accentColor) ? data.accentColor : DEFAULT_ACCENT;
+}
 var CategoryStore = class {
-  constructor(definitions = defaultCategories(), persist = () => Promise.resolve()) {
+  constructor(definitions = defaultCategories(), persist = () => Promise.resolve(), accent = DEFAULT_ACCENT) {
     this.persist = persist;
+    this.accent = accent;
     this.listeners = /* @__PURE__ */ new Set();
     this.saving = false;
     this.revision = 0;
     this.definitions = validateCategories(definitions);
+  }
+  accentColor() {
+    return this.accent;
   }
   all() {
     return this.definitions.map((item) => ({ ...item }));
@@ -22322,13 +22333,15 @@ var CategoryStore = class {
       this.listeners.delete(listener);
     };
   }
-  async save(definitions, expectedRevision) {
+  async save(definitions, expectedRevision, accentColor = this.accent) {
     if (this.saving || expectedRevision !== this.revision) throw new Error("Categories changed in another window. Close this dialog and open it again.");
+    if (!isAccent(accentColor)) throw new Error("Choose a valid accent color.");
     const next = validateCategories(definitions);
     this.saving = true;
     try {
-      await this.persist(next);
+      await this.persist(next, accentColor);
       this.definitions = next;
+      this.accent = accentColor;
       this.revision++;
       this.listeners.forEach((listener) => listener());
     } finally {
@@ -22346,11 +22359,19 @@ var CategoryModal = class extends import_obsidian3.Modal {
     this.saving = false;
     this.draft = store.all();
     this.revision = store.revision;
+    this.accentColor = store.accentColor();
   }
   onOpen() {
     this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
+    const accent = this.contentEl.createDiv({ cls: "pdfaw-accent-setting" });
+    accent.createEl("label", { text: "Accent color", attr: { for: "pdfaw-accent-color" } });
+    this.accentInput = accent.createEl("input", { attr: { id: "pdfaw-accent-color", type: "color", "aria-label": "Accent color" } });
+    this.accentInput.value = this.accentColor;
+    this.accentInput.oninput = () => {
+      this.accentColor = this.accentInput.value;
+    };
     this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
     this.add = this.contentEl.createEl("button", { text: "Add category", attr: { type: "button" } });
@@ -22431,7 +22452,7 @@ var CategoryModal = class extends import_obsidian3.Modal {
       el.disabled = true;
     });
     try {
-      await this.store.save(this.draft, this.revision);
+      await this.store.save(this.draft, this.revision, this.accentColor);
       this.close();
     } catch (error) {
       this.error.setText(error instanceof Error ? error.message : "Could not save categories. Try again.");
@@ -22528,7 +22549,6 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.saveRevision = 0;
     this.generation = 0;
     this.pageGeneration = 0;
-    this.searchGeneration = 0;
     this.currentPage = 1;
     this.pageWidth = 804;
     this.pageHeight = 1137;
@@ -22544,9 +22564,6 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.selectionDrag = null;
     this.activeId = null;
     this.gesture = null;
-    this.searchPages = [];
-    this.searchIndex = -1;
-    this.searchText = /* @__PURE__ */ new Map();
     this.pageReady = false;
     this.geometryFrame = 0;
   }
@@ -22575,24 +22592,8 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.contentEl.empty();
     this.contentEl.addClass("pdfaw-content");
     this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0" } });
+    this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
     const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
-    const search = toolbar.createDiv({ cls: "pdfaw-search" });
-    (0, import_obsidian5.setIcon)(search.createSpan(), "search");
-    this.searchInput = search.createEl("input", { attr: { type: "search", placeholder: "Search document \u2026", "aria-label": "Search document" } });
-    this.searchInput.onkeydown = (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        void this.searchDocument(event.shiftKey ? -1 : 1);
-      }
-      if (event.key === "Escape") {
-        this.searchInput.value = "";
-        this.clearSearch();
-        this.root.focus();
-      }
-    };
-    this.searchInput.oninput = () => this.clearSearch();
-    this.searchStatus = search.createSpan({ cls: "pdfaw-search-status" });
-    this.button(search, "chevron-down", "Next matching page", () => void this.searchDocument(1));
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
     for (const mode of ["canvas", "reading"]) {
       const button = this.button(modes, mode === "canvas" ? "layout-dashboard" : "book-open", mode === "canvas" ? "Canvas mode" : "Reading mode", () => this.setMode(mode));
@@ -22632,9 +22633,6 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     });
     const body = this.root.createDiv({ cls: "pdfaw-body" });
     const sidebar = body.createDiv({ cls: "pdfaw-pages" });
-    const pagesHeading = sidebar.createDiv({ cls: "pdfaw-panel-heading" });
-    pagesHeading.createSpan({ text: "Pages" });
-    (0, import_obsidian5.setIcon)(pagesHeading.createSpan(), "panels-top-left");
     this.thumbnails = sidebar.createDiv({ cls: "pdfaw-thumbnails" });
     this.viewport = body.createDiv({ cls: "pdfaw-viewport" });
     this.stage = this.viewport.createDiv({ cls: "pdfaw-stage" });
@@ -22653,6 +22651,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     );
     this.renderCategoryTools();
     this.register(this.categories.subscribe(() => {
+      this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
       this.renderCategoryTools();
       this.renderFilters();
       this.renderAnnotations();
@@ -22834,7 +22833,6 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.pageChangePending = false;
     this.generation++;
     this.pageGeneration++;
-    this.searchGeneration++;
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
     this.renderTasks.clear();
@@ -22850,11 +22848,6 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.cards.forEach((card) => this.resizeObserver?.unobserve(card));
     this.cards.clear();
     this.thumbButtons.clear();
-    this.searchText.clear();
-    this.searchPages = [];
-    this.searchIndex = -1;
-    this.searchInput.value = "";
-    this.searchStatus.setText("");
     this.gesture = null;
     this.activeId = null;
   }
@@ -22940,12 +22933,10 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       const layer = this.pageEl.createDiv({ cls: "pdfaw-textlayer" });
       const content = await page.getTextContent();
       if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.searchText.set(pageNumber, content.items.map((item) => "str" in item ? item.str : "").join(" ").toLocaleLowerCase());
       this.textLayer = new __webpack_exports__TextLayer({ textContentSource: content, container: layer, viewport });
       await this.textLayer.render();
       if (token !== this.pageGeneration || generation !== this.generation) return;
       this.pageReady = true;
-      this.highlightSearch();
       this.renderAnnotations();
     } catch (error) {
       if (token !== this.pageGeneration || generation !== this.generation) return;
@@ -23429,57 +23420,9 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       svg(this.links, "circle", { cx: anchor.x, cy: anchor.y, r: 3, fill: color });
     }
   }
-  clearSearch() {
-    this.searchGeneration++;
-    this.searchPages = [];
-    this.searchIndex = -1;
-    this.searchStatus.setText("");
-    this.pageEl.querySelectorAll(".pdfaw-search-hit").forEach((el) => el.removeClass("pdfaw-search-hit"));
-  }
-  async searchDocument(direction) {
-    const query = this.searchInput.value.trim().toLocaleLowerCase();
-    if (!query || !this.pdf) return;
-    if (this.searchIndex >= 0 && this.searchPages.length) this.searchIndex = (this.searchIndex + direction + this.searchPages.length) % this.searchPages.length;
-    else {
-      const token = ++this.searchGeneration, pdf = this.pdf;
-      this.searchStatus.setText("Searching \u2026");
-      const pages = [];
-      try {
-        for (let number = 1; number <= pdf.numPages; number++) {
-          if (token !== this.searchGeneration) return;
-          let text = this.searchText.get(number);
-          if (text === void 0) {
-            const content = await (await pdf.getPage(number)).getTextContent();
-            if (token !== this.searchGeneration) return;
-            text = content.items.map((item) => "str" in item ? item.str : "").join(" ").toLocaleLowerCase();
-            this.searchText.set(number, text);
-          }
-          if (text.includes(query)) pages.push(number);
-        }
-        if (token !== this.searchGeneration) return;
-        this.searchPages = pages;
-        this.searchIndex = pages.length ? 0 : -1;
-      } catch {
-        if (token === this.searchGeneration) this.searchStatus.setText("Search failed");
-        return;
-      }
-    }
-    this.searchStatus.setText(this.searchPages.length ? `${this.searchIndex + 1}/${this.searchPages.length} Pages` : "No matches");
-    if (this.searchIndex >= 0) await this.showPage(this.searchPages[this.searchIndex]);
-  }
-  highlightSearch() {
-    const query = this.searchInput.value.trim().toLocaleLowerCase();
-    if (!query) return;
-    this.pageEl.querySelectorAll(".pdfaw-textlayer span").forEach((span) => span.toggleClass("pdfaw-search-hit", !!span.textContent?.toLocaleLowerCase().includes(query)));
-  }
   onKey(event) {
     if (event.key === "Escape") this.commentPreview.hide();
     if (event.target.closest("input, textarea, [contenteditable=true]")) return;
-    if ((event.ctrlKey || event.metaKey) && event.key === "f") {
-      event.preventDefault();
-      this.searchInput.focus();
-      return;
-    }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "Escape") {
       this.clearSelection();
@@ -23504,7 +23447,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
 var RemarkMyWordsPlugin = class extends import_obsidian5.Plugin {
   async onload() {
     const stored = await this.loadData();
-    this.categories = new CategoryStore(readCategorySettings(stored), (categories) => this.saveData({ categories }));
+    this.categories = new CategoryStore(readCategorySettings(stored), (categories, accentColor) => this.saveData({ categories, accentColor }), readAccentColor(stored));
     this.registerView(VIEW_TYPE, (leaf) => new PdfAnnotatorView(leaf, this.categories));
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
     this.addCommand({ id: "manage-categories", name: "Customize", callback: () => new CategoryModal(this.app, this.categories).open() });

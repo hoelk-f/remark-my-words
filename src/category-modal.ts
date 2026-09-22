@@ -8,14 +8,20 @@ export class CategoryModal extends Modal {
   private list!: HTMLDivElement;
   private error!: HTMLDivElement;
   private add!: HTMLButtonElement;
+  private accentInput!: HTMLInputElement;
+  private accentColor: string;
   private saving = false;
   constructor(app: App, private store: CategoryStore) {
-    super(app); this.draft = store.all(); this.revision = store.revision;
+    super(app); this.draft = store.all(); this.revision = store.revision; this.accentColor = store.accentColor();
   }
   onOpen() {
     this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
+    const accent = this.contentEl.createDiv({ cls: "pdfaw-accent-setting" });
+    accent.createEl("label", { text: "Accent color", attr: { for: "pdfaw-accent-color" } });
+    this.accentInput = accent.createEl("input", { attr: { id: "pdfaw-accent-color", type: "color", "aria-label": "Accent color" } });
+    this.accentInput.value = this.accentColor; this.accentInput.oninput = () => { this.accentColor = this.accentInput.value; };
     this.list = this.contentEl.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
     this.add = this.contentEl.createEl("button", { text: "Add category", attr: { type: "button" } });
@@ -74,7 +80,7 @@ export class CategoryModal extends Modal {
     }
     this.error.setText(""); this.saving = true;
     this.contentEl.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>("input, button, select").forEach(el => { el.disabled = true; });
-    try { await this.store.save(this.draft, this.revision); this.close(); }
+    try { await this.store.save(this.draft, this.revision, this.accentColor); this.close(); }
     catch (error) {
       this.error.setText(error instanceof Error ? error.message : "Could not save categories. Try again.");
       this.contentEl.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>("input, button, select").forEach(el => { el.disabled = false; });

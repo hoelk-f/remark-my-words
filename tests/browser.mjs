@@ -84,6 +84,8 @@ try {
   await cdp('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/` });
   await until('window.ready === true');
   assert.equal(await evaluate('view.pageReady'), true, 'Real PDF must render with a text layer');
+  assert.equal(await evaluate('document.querySelector(".pdfaw-search")'), null, 'Search bar is removed');
+  assert.equal(await evaluate('document.querySelector(".pdfaw-pages .pdfaw-panel-heading")'), null, 'Pages header is removed');
   assert.ok(await evaluate('document.querySelectorAll(".pdfaw-textlayer span").length') > 20);
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.pdfaw-modes button'), b => ({ text: b.textContent, label: b.getAttribute('aria-label'), icon: b.dataset.icon }))`), [
     { text: '', label: 'Canvas mode', icon: 'layout-dashboard' },
@@ -190,9 +192,7 @@ try {
   await evaluate(`document.querySelector('.pdfaw-comment-card').focus();document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));view.saveQueue`);
   await evaluate('view.showPage(2)');
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 0);
-  await evaluate(`view.searchInput.value='kognitive'; view.clearSearch(); view.searchDocument(1)`);
-  assert.equal(await evaluate('view.currentPage'), 1);
-  assert.ok(await evaluate('document.querySelectorAll(".pdfaw-search-hit").length') > 0);
+  await evaluate('view.showPage(1)');
   const canvasState = await evaluate('({ camera: {...view.camera}, positions: view.sidecar.annotations.map(a=>a.position) })');
   await evaluate(`document.querySelector('.pdfaw-modes button:nth-child(2)').click()`);
   assert.equal(await evaluate('view.mode'), 'reading');
@@ -344,7 +344,7 @@ try {
   assert.equal(await evaluate('storage.get("Kaputt.pdf.obsidian-annot.json")'), '{broken');
   await evaluate('view.onClose()');
   assert.deepEqual(errors, [], 'No uncaught browser exceptions');
-  console.log('PASS: real PDF rendering, small-cap selection, six categories, links, drag at zoom, reload persistence, filters, selection/editor, reading comments and scroll, mode switching, responsive widths, page switch, search, notes flush, invalid-sidecar protection');
+  console.log('PASS: real PDF rendering, small-cap selection, six categories, links, drag at zoom, reload persistence, filters, selection/editor, reading comments and scroll, mode switching, responsive widths, page switch, notes flush, invalid-sidecar protection');
   console.log(`Screenshot: ${path.join(artifacts, 'canvas.png')}`);
 } finally {
   socket?.close(); browser.kill(); server.closeAllConnections(); server.close();

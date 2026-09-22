@@ -5,7 +5,7 @@ import { Annotation, Bounds, CARD_WIDTH, Category, PDF_SCALE, Point, Quad, Sidec
 import { CommentDraft, CommentModal } from "./editor";
 import { selectionQuads } from "./selection";
 import { CommentPreview } from "./comment-preview";
-import { CategoryStore, readCategorySettings } from "./category-store";
+import { CategoryStore, readAccentColor, readCategorySettings } from "./category-store";
 import { CategoryModal } from "./category-modal";
 import { PdfPicker, RemarkSettingsTab } from "./plugin-access";
 import workerSource from "embedded-pdf-worker";
@@ -39,8 +39,6 @@ export class PdfAnnotatorView extends FileView {
   private selectionBar!: HTMLDivElement;
   private commentPreview!: CommentPreview;
   private filterBar!: HTMLDivElement;
-  private searchInput!: HTMLInputElement;
-  private searchStatus!: HTMLSpanElement;
   private toolButtons = new Map<string, HTMLButtonElement>();
   private cards = new Map<string, HTMLDivElement>();
   private thumbButtons = new Map<number, HTMLButtonElement>();
@@ -58,7 +56,6 @@ export class PdfAnnotatorView extends FileView {
   private notesTimer: number | undefined;
   private generation = 0;
   private pageGeneration = 0;
-  private searchGeneration = 0;
   private currentPage = 1;
   private pageWidth = 804;
   private pageHeight = 1137;
@@ -74,9 +71,6 @@ export class PdfAnnotatorView extends FileView {
   private selectionDrag: { pointer: number; start: Point; origin: Point } | null = null;
   private activeId: string | null = null;
   private gesture: { pointer: number; start: Point; origin: Point; card?: Annotation; element: HTMLElement } | null = null;
-  private searchPages: number[] = [];
-  private searchIndex = -1;
-  private searchText = new Map<number, string>();
   private pageReady = false;
   private geometryFrame = 0;
 
@@ -96,17 +90,8 @@ export class PdfAnnotatorView extends FileView {
   async onOpen() {
     this.contentEl.empty(); this.contentEl.addClass("pdfaw-content");
     this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0" } });
+    this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
     const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
-    const search = toolbar.createDiv({ cls: "pdfaw-search" });
-    setIcon(search.createSpan(), "search");
-    this.searchInput = search.createEl("input", { attr: { type: "search", placeholder: "Search document …", "aria-label": "Search document" } });
-    this.searchInput.onkeydown = event => {
-      if (event.key === "Enter") { event.preventDefault(); void this.searchDocument(event.shiftKey ? -1 : 1); }
-      if (event.key === "Escape") { this.searchInput.value = ""; this.clearSearch(); this.root.focus(); }
-    };
-    this.searchInput.oninput = () => this.clearSearch();
-    this.searchStatus = search.createSpan({ cls: "pdfaw-search-status" });
-    this.button(search, "chevron-down", "Next matching page", () => void this.searchDocument(1));
 
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
     for (const mode of ["canvas", "reading"] as const) {
@@ -144,8 +129,6 @@ export class PdfAnnotatorView extends FileView {
 
     const body = this.root.createDiv({ cls: "pdfaw-body" });
     const sidebar = body.createDiv({ cls: "pdfaw-pages" });
-    const pagesHeading = sidebar.createDiv({ cls: "pdfaw-panel-heading" });
-    pagesHeading.createSpan({ text: "Pages" }); setIcon(pagesHeading.createSpan(), "panels-top-left");
     this.thumbnails = sidebar.createDiv({ cls: "pdfaw-thumbnails" });
     this.viewport = body.createDiv({ cls: "pdfaw-viewport" });
     this.stage = this.viewport.createDiv({ cls: "pdfaw-stage" });
@@ -164,6 +147,7 @@ export class PdfAnnotatorView extends FileView {
     );
     this.renderCategoryTools();
     this.register(this.categories.subscribe(() => {
+      this.root.setCssProps({ "--pdfaw-accent": this.categories.accentColor() });
       this.renderCategoryTools(); this.renderFilters(); this.renderAnnotations(); this.positionSelectionBar();
     }));
     const notesPanel = body.createDiv({ cls: "pdfaw-notes-panel" });
@@ -294,7 +278,7 @@ export class PdfAnnotatorView extends FileView {
   private releaseDocument() {
     this.commentPreview.hide();
     this.selectionPointer = null; this.commentPress = null; this.pageChangePending = false;
-    this.generation++; this.pageGeneration++; this.searchGeneration++;
+    this.generation++; this.pageGeneration++;
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
     this.renderTasks.clear(); this.pageTask = null;
@@ -302,8 +286,7 @@ export class PdfAnnotatorView extends FileView {
     if (this.loading) void this.loading.destroy().catch(() => {});
     this.loading = null; this.pdf = null; this.pageReady = false;
     this.clearSelection(); this.cards.forEach(card => this.resizeObserver?.unobserve(card));
-    this.cards.clear(); this.thumbButtons.clear(); this.searchText.clear();
-    this.searchPages = []; this.searchIndex = -1; this.searchInput.value = ""; this.searchStatus.setText("");
+    this.cards.clear(); this.thumbButtons.clear();
     this.gesture = null; this.activeId = null;
   }
   private async flushNotes() {
@@ -361,11 +344,10 @@ export class PdfAnnotatorView extends FileView {
       const layer = this.pageEl.createDiv({ cls: "pdfaw-textlayer" });
       const content = await page.getTextContent();
       if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.searchText.set(pageNumber, content.items.map(item => "str" in item ? item.str : "").join(" ").toLocaleLowerCase());
       this.textLayer = new pdfjs.TextLayer({ textContentSource: content, container: layer, viewport });
       await this.textLayer.render();
       if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.pageReady = true; this.highlightSearch(); this.renderAnnotations();
+      this.pageReady = true; this.renderAnnotations();
     } catch (error) {
       if (token !== this.pageGeneration || generation !== this.generation) return;
       this.pageEl.createDiv({ cls: "pdfaw-loading pdfaw-error", text: "Could not render this page." });
@@ -709,37 +691,9 @@ export class PdfAnnotatorView extends FileView {
       svg(this.links, "circle", { cx: anchor.x, cy: anchor.y, r: 3, fill: color });
     }
   }
-  private clearSearch() { this.searchGeneration++; this.searchPages = []; this.searchIndex = -1; this.searchStatus.setText(""); this.pageEl.querySelectorAll(".pdfaw-search-hit").forEach(el => el.removeClass("pdfaw-search-hit")); }
-  private async searchDocument(direction: number) {
-    const query = this.searchInput.value.trim().toLocaleLowerCase(); if (!query || !this.pdf) return;
-    if (this.searchIndex >= 0 && this.searchPages.length) this.searchIndex = (this.searchIndex + direction + this.searchPages.length) % this.searchPages.length;
-    else {
-      const token = ++this.searchGeneration, pdf = this.pdf; this.searchStatus.setText("Searching …"); const pages: number[] = [];
-      try {
-        for (let number = 1; number <= pdf.numPages; number++) {
-          if (token !== this.searchGeneration) return;
-          let text = this.searchText.get(number);
-          if (text === undefined) {
-            const content = await (await pdf.getPage(number)).getTextContent(); if (token !== this.searchGeneration) return;
-            text = content.items.map(item => "str" in item ? item.str : "").join(" ").toLocaleLowerCase(); this.searchText.set(number, text);
-          }
-          if (text.includes(query)) pages.push(number);
-        }
-        if (token !== this.searchGeneration) return;
-        this.searchPages = pages; this.searchIndex = pages.length ? 0 : -1;
-      } catch { if (token === this.searchGeneration) this.searchStatus.setText("Search failed"); return; }
-    }
-    this.searchStatus.setText(this.searchPages.length ? `${this.searchIndex + 1}/${this.searchPages.length} Pages` : "No matches");
-    if (this.searchIndex >= 0) await this.showPage(this.searchPages[this.searchIndex]);
-  }
-  private highlightSearch() {
-    const query = this.searchInput.value.trim().toLocaleLowerCase(); if (!query) return;
-    this.pageEl.querySelectorAll<HTMLElement>(".pdfaw-textlayer span").forEach(span => span.toggleClass("pdfaw-search-hit", !!span.textContent?.toLocaleLowerCase().includes(query)));
-  }
   private onKey(event: KeyboardEvent) {
     if (event.key === "Escape") this.commentPreview.hide();
     if ((event.target as HTMLElement).closest("input, textarea, [contenteditable=true]")) return;
-    if ((event.ctrlKey || event.metaKey) && event.key === "f") { event.preventDefault(); this.searchInput.focus(); return; }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "Escape") { this.clearSelection(); this.win.getSelection()?.removeAllRanges(); this.setTool("select"); }
     if (event.key.toLowerCase() === "h") this.setTool("hand");
@@ -756,7 +710,7 @@ export default class RemarkMyWordsPlugin extends Plugin {
   private categories!: CategoryStore;
   async onload() {
     const stored: unknown = await this.loadData();
-    this.categories = new CategoryStore(readCategorySettings(stored), categories => this.saveData({ categories }));
+    this.categories = new CategoryStore(readCategorySettings(stored), (categories, accentColor) => this.saveData({ categories, accentColor }), readAccentColor(stored));
     this.registerView(VIEW_TYPE, leaf => new PdfAnnotatorView(leaf, this.categories));
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
     this.addCommand({ id: "manage-categories", name: "Customize", callback: () => new CategoryModal(this.app, this.categories).open() });

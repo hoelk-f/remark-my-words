@@ -22,7 +22,7 @@ Use it for manuals, reports, books, articles, and other PDF documents in your va
 
 Use the default categories or create your own categories for each annotation.
 Each comment can have a title, description, and tags.
-Page thumbnails, document search, and document-wide notes are included.
+Page thumbnails and document-wide notes are included.
 
 ## Install
 
@@ -84,7 +84,6 @@ sync these files; the plugin does not provide its own synchronization.
 | Ctrl/⌘ + wheel | Zoom around the pointer |
 | 0 | Fit page and cards in Canvas; fit page width in Reading |
 | Page Up / Page Down | Previous / next page |
-| Ctrl/⌘ + F | Search this PDF |
 | Escape | Dismiss a preview or clear the selection |
 | Arrow keys on a focused card | Move by 10 units; Shift moves by 40 |
 | Enter on a focused card | Edit the comment |
