@@ -114,7 +114,8 @@ export class PdfAnnotatorView extends FileView {
     this.button(navigation, "chevron-left", "Previous page", () => void this.showPage(this.currentPage - 1));
     this.pageInput = navigation.createEl("input", { attr: { type: "number", min: "1", value: "1", "aria-label": "Page number" } });
     this.pageInput.onchange = () => { void this.showPage(Number(this.pageInput.value)); this.pageInput.value = String(this.currentPage); };
-    this.pageTotal = navigation.createSpan({ text: "/ 0" });
+    navigation.createSpan({ text: "/", attr: { "aria-hidden": "true" } });
+    this.pageTotal = navigation.createSpan({ cls: "pdfaw-page-total", text: "0" });
     this.button(navigation, "chevron-right", "Next page", () => void this.showPage(this.currentPage + 1));
     const right = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-toolbar-end" });
     const readComments = this.button(right, "messages-square", "Read page comments", () => {
@@ -267,7 +268,7 @@ export class PdfAnnotatorView extends FileView {
       if (generation !== this.generation) { void pdf.destroy(); return; }
       this.pdf = pdf; this.sidecar = data; this.renderFilters();
       this.noteInput.disabled = false; this.noteInput.value = data.notes; this.saveStatus.setText("Local to vault");
-      this.pageTotal.setText(`/ ${pdf.numPages}`); this.pageInput.max = String(pdf.numPages);
+      this.pageTotal.setText(String(pdf.numPages)); this.pageInput.max = String(pdf.numPages);
       this.buildThumbnails(); await this.showPage(1);
     } catch (error) {
       if (generation !== this.generation) return;

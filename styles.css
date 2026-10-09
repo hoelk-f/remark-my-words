@@ -20,9 +20,11 @@
 .pdfaw-root .pdfaw-icon-button.is-active { border-color: color-mix(in srgb, var(--pdfaw-accent) 70%, transparent); background: color-mix(in srgb, var(--pdfaw-accent) 17%, transparent); color: color-mix(in srgb, var(--pdfaw-accent) 72%, white); }
 .pdfaw-toolbar-end { margin-left: auto; }
 .pdfaw-root button.pdfaw-zoom-label { min-width: 55px; padding: 3px; background: transparent; border: 0; }
-.pdfaw-navigation input { width: 38px; padding: 0; border: 0; background: transparent; color: var(--pdfaw-text); text-align: center; box-shadow: none; appearance: textfield; }
+.pdfaw-navigation { font-variant-numeric: tabular-nums; }
+.pdfaw-navigation input, .pdfaw-navigation .pdfaw-page-total { width: 38px; flex-shrink: 0; text-align: center; }
+.pdfaw-navigation input { padding: 0; border: 0; background: transparent; color: var(--pdfaw-text); font: inherit; box-shadow: none; appearance: textfield; }
 .pdfaw-navigation input::-webkit-inner-spin-button { appearance: none; }
-.pdfaw-navigation > span { white-space: nowrap; color: var(--pdfaw-muted); padding-right: 5px; }
+.pdfaw-navigation > span { white-space: nowrap; color: var(--pdfaw-muted); }
 .pdfaw-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .pdfaw-pages { display: flex; flex-direction: column; flex: 0 0 156px; min-width: 0; border-right: 1px solid var(--pdfaw-border); background: linear-gradient(90deg, var(--pdfaw-panel), var(--pdfaw-bg)); }
 .pdfaw-panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 16px; font-size: 12px; color: color-mix(in srgb, var(--pdfaw-text) 82%, var(--pdfaw-muted)); }

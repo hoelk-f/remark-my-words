@@ -22643,7 +22643,8 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       void this.showPage(Number(this.pageInput.value));
       this.pageInput.value = String(this.currentPage);
     };
-    this.pageTotal = navigation.createSpan({ text: "/ 0" });
+    navigation.createSpan({ text: "/", attr: { "aria-hidden": "true" } });
+    this.pageTotal = navigation.createSpan({ cls: "pdfaw-page-total", text: "0" });
     this.button(navigation, "chevron-right", "Next page", () => void this.showPage(this.currentPage + 1));
     const right = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-toolbar-end" });
     const readComments = this.button(right, "messages-square", "Read page comments", () => {
@@ -22836,7 +22837,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.noteInput.disabled = false;
       this.noteInput.value = data.notes;
       this.saveStatus.setText("Local to vault");
-      this.pageTotal.setText(`/ ${pdf.numPages}`);
+      this.pageTotal.setText(String(pdf.numPages));
       this.pageInput.max = String(pdf.numPages);
       this.buildThumbnails();
       await this.showPage(1);
