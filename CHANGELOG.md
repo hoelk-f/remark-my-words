@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.13 — 2026-10-09
+
+- See the GitHub release notes for the included changes.
+
 ## 0.2.12 — 2026-09-22
 
 - See the GitHub release notes for the included changes.
