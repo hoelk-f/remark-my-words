@@ -245,7 +245,7 @@ __export(main_exports, {
   default: () => RemarkMyWordsPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // node_modules/pdfjs-dist/build/pdf.mjs
 var import_meta = {};
@@ -22077,21 +22077,73 @@ function fitCamera(bounds, width, height) {
 }
 
 // src/editor.ts
+var import_obsidian2 = require("obsidian");
+
+// src/modal.ts
 var import_obsidian = require("obsidian");
-var CommentModal = class extends import_obsidian.Modal {
-  constructor(app, draft, quote, submit, categories) {
+
+// src/theme.ts
+function applyThemeColors(element, theme) {
+  element.setCssProps({
+    "--pdfaw-bg": theme.background,
+    "--pdfaw-panel": theme.panel,
+    "--pdfaw-border": theme.border,
+    "--pdfaw-text": theme.text,
+    "--pdfaw-muted": theme.muted,
+    "--pdfaw-accent": theme.accent
+  });
+}
+
+// src/modal.ts
+function applyModalTheme(modal, theme) {
+  modal.modalEl.addClass("pdfaw-modal");
+  applyThemeColors(modal.modalEl, theme);
+}
+var DeleteCommentModal = class extends import_obsidian.Modal {
+  constructor(app, label, theme, confirm) {
+    super(app);
+    this.label = label;
+    this.theme = theme;
+    this.confirm = confirm;
+  }
+  onOpen() {
+    applyModalTheme(this, this.theme);
+    this.modalEl.addClass("pdfaw-delete-modal");
+    this.setTitle("Delete comment?");
+    this.contentEl.createEl("p", { text: "This comment and its highlight will be removed. This cannot be undone." });
+    this.contentEl.createEl("blockquote", { cls: "pdfaw-delete-summary", text: this.label });
+    const actions = this.contentEl.createDiv({ cls: "pdfaw-modal-actions" });
+    const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
+    cancel.onclick = () => this.close();
+    const remove = actions.createEl("button", { text: "Delete", cls: "mod-warning", attr: { type: "button" } });
+    remove.onclick = () => {
+      this.close();
+      this.confirm();
+    };
+    cancel.focus();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
+// src/editor.ts
+var CommentModal = class extends import_obsidian2.Modal {
+  constructor(app, draft, quote, submit, categories, theme) {
     super(app);
     this.draft = draft;
     this.quote = quote;
     this.submit = submit;
     this.categories = categories;
+    this.theme = theme;
   }
   onOpen() {
+    applyModalTheme(this, this.theme);
     this.setTitle(this.draft.title ? "Edit comment" : "Add comment");
     this.contentEl.addClass("pdfaw-editor");
     const draft = { ...this.draft };
     this.contentEl.createEl("blockquote", { text: this.quote });
-    new import_obsidian.Setting(this.contentEl).setName("Category").addDropdown((select) => {
+    new import_obsidian2.Setting(this.contentEl).setName("Category").addDropdown((select) => {
       for (const category of this.categories) select.addOption(category.id, category.label);
       select.setValue(draft.category).onChange((value) => {
         draft.category = value;
@@ -22125,7 +22177,7 @@ var CommentModal = class extends import_obsidian.Modal {
       this.submit({ ...draft, title: draft.title?.trim(), comment: draft.comment?.trim() });
       this.close();
     };
-    new import_obsidian.Setting(this.contentEl).addButton((button) => button.setButtonText("Cancel").onClick(() => this.close())).addButton((button) => button.setButtonText("Save").setCta().onClick(save));
+    new import_obsidian2.Setting(this.contentEl).addButton((button) => button.setButtonText("Cancel").onClick(() => this.close())).addButton((button) => button.setButtonText("Save").setCta().onClick(save));
     body.onkeydown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
         event.preventDefault();
@@ -22176,7 +22228,7 @@ function selectionQuads(range, layer, page, zoom) {
 }
 
 // src/comment-preview.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var CommentPreview = class {
   constructor(root, viewport, categoryFor, actions) {
     this.root = root;
@@ -22196,9 +22248,6 @@ var CommentPreview = class {
       }
     };
   }
-  get win() {
-    return this.root.ownerDocument.defaultView;
-  }
   show(annotations, anchor, opener) {
     this.returnFocus = opener ?? null;
     this.el.empty();
@@ -22206,7 +22255,7 @@ var CommentPreview = class {
     const heading = this.el.createDiv({ cls: "pdfaw-preview-heading" });
     heading.createSpan({ text: annotations.length === 1 ? "Comment" : "Comments" });
     const close = heading.createEl("button", { cls: "pdfaw-icon-button", attr: { type: "button", "aria-label": "Close preview" } });
-    (0, import_obsidian2.setIcon)(close, "x");
+    (0, import_obsidian3.setIcon)(close, "x");
     close.onclick = () => this.hide();
     if (!annotations.length) this.el.createDiv({ text: "No comments on this page yet." });
     for (const annotation of annotations) {
@@ -22214,22 +22263,21 @@ var CommentPreview = class {
       const item = this.el.createEl("article", { cls: "pdfaw-preview-item" });
       item.style.setProperty("--category", category.hex);
       const badge = item.createDiv({ cls: "pdfaw-preview-category" });
-      (0, import_obsidian2.setIcon)(badge.createSpan(), category.icon);
+      (0, import_obsidian3.setIcon)(badge.createSpan(), category.icon);
       badge.createSpan({ text: category.label });
       if (annotation.title) item.createEl("h3", { text: annotation.title });
       item.createDiv({ cls: "pdfaw-preview-body", text: annotation.comment?.trim() || annotation.text });
       if (annotation.tags?.length) item.createDiv({ cls: "pdfaw-preview-tags", text: annotation.tags.join(" \xB7 ") });
       const actions = item.createDiv({ cls: "pdfaw-preview-actions" });
       const edit = actions.createEl("button", { text: "Edit", attr: { type: "button", "aria-label": "Edit comment" } });
-      (0, import_obsidian2.setIcon)(edit, "pencil");
+      (0, import_obsidian3.setIcon)(edit, "pencil");
       edit.onclick = () => {
         this.hide();
         this.actions.edit(annotation);
       };
       const remove = actions.createEl("button", { text: "Delete", attr: { type: "button", "aria-label": "Delete comment" } });
-      (0, import_obsidian2.setIcon)(remove, "trash-2");
+      (0, import_obsidian3.setIcon)(remove, "trash-2");
       remove.onclick = () => {
-        if (!this.win.confirm("Delete this comment?")) return;
         this.hide();
         this.actions.remove(annotation);
       };
@@ -22366,8 +22414,8 @@ var CategoryStore = class {
 };
 
 // src/category-modal.ts
-var import_obsidian3 = require("obsidian");
-var CategoryModal = class extends import_obsidian3.Modal {
+var import_obsidian4 = require("obsidian");
+var CategoryModal = class extends import_obsidian4.Modal {
   constructor(app, store) {
     super(app);
     this.store = store;
@@ -22377,6 +22425,7 @@ var CategoryModal = class extends import_obsidian3.Modal {
     this.theme = store.themeColors();
   }
   onOpen() {
+    applyModalTheme(this, this.theme);
     this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
@@ -22391,6 +22440,7 @@ var CategoryModal = class extends import_obsidian3.Modal {
       picker.value = this.theme[key];
       picker.oninput = () => {
         this.theme[key] = picker.value;
+        applyModalTheme(this, this.theme);
       };
     }
     const categories = this.contentEl.createDiv({ cls: "pdfaw-category-settings" });
@@ -22422,7 +22472,7 @@ var CategoryModal = class extends import_obsidian3.Modal {
       const row = this.list.createDiv({ cls: "pdfaw-category-row", attr: { "data-category-id": item.id } });
       const preview = row.createSpan({ cls: "pdfaw-category-preview", attr: { "aria-hidden": "true" } });
       preview.setCssProps({ "--category": item.hex });
-      (0, import_obsidian3.setIcon)(preview, item.icon);
+      (0, import_obsidian4.setIcon)(preview, item.icon);
       const field = (label, cls) => {
         const el = row.createDiv({ cls });
         el.createEl("label", { text: label, attr: { for: `${item.id}-${cls}` } });
@@ -22448,10 +22498,10 @@ var CategoryModal = class extends import_obsidian3.Modal {
       select.value = item.icon;
       select.onchange = () => {
         item.icon = select.value;
-        (0, import_obsidian3.setIcon)(preview, item.icon);
+        (0, import_obsidian4.setIcon)(preview, item.icon);
       };
       const remove = row.createEl("button", { cls: "pdfaw-category-delete", attr: { type: "button", "aria-label": `Delete ${item.label || "category"}`, title: active.length === 1 ? "Keep at least one category" : "Delete category" } });
-      (0, import_obsidian3.setIcon)(remove, "trash-2");
+      (0, import_obsidian4.setIcon)(remove, "trash-2");
       remove.disabled = active.length === 1;
       remove.onclick = () => {
         if (this.saving) return;
@@ -22495,12 +22545,17 @@ var CategoryModal = class extends import_obsidian3.Modal {
 };
 
 // src/plugin-access.ts
-var import_obsidian4 = require("obsidian");
-var PdfPicker = class extends import_obsidian4.FuzzySuggestModal {
-  constructor(app, choose) {
+var import_obsidian5 = require("obsidian");
+var PdfPicker = class extends import_obsidian5.FuzzySuggestModal {
+  constructor(app, choose, theme) {
     super(app);
     this.choose = choose;
+    this.theme = theme;
     this.setPlaceholder("Choose a PDF from this vault");
+  }
+  async onOpen() {
+    applyModalTheme(this, this.theme);
+    await super.onOpen();
   }
   getItems() {
     return this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === "pdf").sort((a, b) => a.path.localeCompare(b.path));
@@ -22512,7 +22567,7 @@ var PdfPicker = class extends import_obsidian4.FuzzySuggestModal {
     this.choose(file);
   }
 };
-var RemarkSettingsTab = class extends import_obsidian4.PluginSettingTab {
+var RemarkSettingsTab = class extends import_obsidian5.PluginSettingTab {
   constructor(app, plugin, categories, openPdf) {
     super(app, plugin);
     this.categories = categories;
@@ -22550,7 +22605,7 @@ function svg(parent, tag, attrs) {
   parent.appendChild(el);
   return el;
 }
-var PdfAnnotatorView = class extends import_obsidian5.FileView {
+var PdfAnnotatorView = class extends import_obsidian6.FileView {
   constructor(leaf, categories) {
     super(leaf);
     this.categories = categories;
@@ -22566,6 +22621,11 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.workerUrl = null;
     this.renderTasks = /* @__PURE__ */ new Set();
     this.pageTask = null;
+    this.rasterPage = null;
+    this.pageCanvas = null;
+    this.rasterDensity = 0;
+    this.requestedDensity = 0;
+    this.rasterRevision = 0;
     this.textLayer = null;
     this.thumbObserver = null;
     this.resizeObserver = null;
@@ -22608,7 +22668,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
   }
   button(parent, icon, label, action, cls = "") {
     const button = parent.createEl("button", { cls: `pdfaw-icon-button ${cls}`, attr: { "aria-label": label, type: "button" } });
-    (0, import_obsidian5.setIcon)(button, icon);
+    (0, import_obsidian6.setIcon)(button, icon);
     button.onclick = action;
     return button;
   }
@@ -22745,13 +22805,17 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.registerDomEvent(this.viewport, "wheel", (event) => {
       if (event.target.closest(".pdfaw-comment-body")) return;
       if (this.mode === "reading" && !event.ctrlKey && !event.metaKey) {
+        if (this.pageChangePending || !this.pageReady) {
+          event.preventDefault();
+          return;
+        }
         const atTop = this.viewport.scrollTop <= 2;
         const atBottom = this.viewport.scrollTop + this.viewport.clientHeight >= this.viewport.scrollHeight - 2;
         const nextPage = event.deltaY > 0 && atBottom ? this.currentPage + 1 : event.deltaY < 0 && atTop ? this.currentPage - 1 : null;
         if (nextPage !== null && nextPage >= 1 && nextPage <= (this.pdf?.numPages ?? 1) && !this.pageChangePending) {
           event.preventDefault();
           this.pageChangePending = true;
-          void this.showPage(nextPage).finally(() => {
+          void this.showPage(nextPage, event.deltaY < 0 ? "bottom" : "top").finally(() => {
             this.pageChangePending = false;
           });
         }
@@ -22769,7 +22833,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.captureSelection();
       if (!this.selection) return;
       event.preventDefault();
-      const menu = new import_obsidian5.Menu();
+      const menu = new import_obsidian6.Menu();
       for (const category of this.categories.active()) menu.addItem((item) => item.setTitle(category.label).setIcon(category.icon).onClick(() => this.editSelection(category.id)));
       menu.showAtMouseEvent(event);
     });
@@ -22777,7 +22841,9 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.registerDomEvent(this.contentEl.ownerDocument, "keydown", (event) => {
       if (event.key === "Escape") this.commentPreview.hide();
     });
+    this.registerDomEvent(this.win, "resize", () => this.queuePageRaster());
     this.resizeObserver = new ResizeObserver((entries) => {
+      this.queuePageRaster();
       if (this.mode === "reading") {
         if (entries.some((entry) => entry.target === this.viewport)) this.applyCamera();
       } else this.queueGeometry();
@@ -22790,15 +22856,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     return { x: box.left, y: box.bottom };
   }
   applyTheme() {
-    const theme = this.categories.themeColors();
-    this.root.setCssProps({
-      "--pdfaw-bg": theme.background,
-      "--pdfaw-panel": theme.panel,
-      "--pdfaw-border": theme.border,
-      "--pdfaw-text": theme.text,
-      "--pdfaw-muted": theme.muted,
-      "--pdfaw-accent": theme.accent
-    });
+    applyThemeColors(this.root, this.categories.themeColors());
   }
   async onLoadFile(file) {
     if (!this.root) await this.onOpen();
@@ -22820,7 +22878,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       if (generation !== this.generation) return;
       const path = `${file.path}.obsidian-annot.json`;
       const existing = this.app.vault.getAbstractFileByPath(path);
-      const data = existing instanceof import_obsidian5.TFile ? readSidecar(await this.app.vault.read(existing), file.path) : { version: 2, pdfPath: file.path, annotations: [], notes: "" };
+      const data = existing instanceof import_obsidian6.TFile ? readSidecar(await this.app.vault.read(existing), file.path) : { version: 2, pdfPath: file.path, annotations: [], notes: "" };
       const buffer = await this.app.vault.readBinary(file);
       if (generation !== this.generation) return;
       this.workerUrl ?? (this.workerUrl = URL.createObjectURL(new Blob([pdf_worker_min_default], { type: "text/javascript" })));
@@ -22846,7 +22904,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.pageEl.empty();
       this.pageEl.createDiv({ cls: "pdfaw-loading pdfaw-error", text: `Could not open PDF. ${error instanceof Error ? error.message : String(error)}` });
       this.saveStatus.setText("Failed to load");
-      new import_obsidian5.Notice("Remark My Words: Failed to load. Existing annotation files have not been changed.");
+      new import_obsidian6.Notice("Remark My Words: Failed to load. Existing annotation files have not been changed.");
       console.error("Remark My Words", error);
     }
   }
@@ -22871,6 +22929,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.pageChangePending = false;
     this.generation++;
     this.pageGeneration++;
+    this.resetPageRaster();
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
     this.renderTasks.clear();
@@ -22904,12 +22963,12 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     this.saveStatus.setText("Saving \u2026");
     this.saveQueue = this.saveQueue.then(async () => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian5.TFile) await this.app.vault.modify(file, data);
+      if (file instanceof import_obsidian6.TFile) await this.app.vault.modify(file, data);
       else await this.app.vault.create(path, data);
       if (generation === this.generation && revision === this.saveRevision) this.saveStatus.setText("Saved to vault");
     }).catch((error) => {
       if (generation === this.generation) this.saveStatus.setText("Failed to save");
-      new import_obsidian5.Notice("Could not save comments. Check write permissions for the vault.");
+      new import_obsidian6.Notice("Could not save comments. Check write permissions for the vault.");
       console.error("Remark My Words: save", error);
     });
     return this.saveQueue;
@@ -22921,7 +22980,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     canvas.setCssProps({ "--canvas-width": `${viewport.width}px`, "--canvas-height": `${viewport.height}px` });
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas unavailable.");
-    const task = page.render({ canvasContext: context, viewport, transform: density === 1 ? void 0 : [density, 0, 0, density, 0, 0] });
+    const task = page.render({ canvasContext: context, viewport, transform: [canvas.width / viewport.width, 0, 0, canvas.height / viewport.height, 0, 0] });
     if (main) this.pageTask = task;
     this.renderTasks.add(task);
     try {
@@ -22931,8 +22990,58 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       if (this.pageTask === task) this.pageTask = null;
     }
   }
-  async showPage(pageNumber) {
+  resetPageRaster() {
+    this.win.clearTimeout(this.rasterTimer);
+    this.rasterTimer = void 0;
+    this.rasterRevision++;
+    this.pageTask?.cancel();
+    this.rasterPage = null;
+    this.pageCanvas = null;
+    this.rasterDensity = 0;
+    this.requestedDensity = 0;
+  }
+  pageDensity() {
+    return Math.min(
+      this.camera.zoom * (this.win.devicePixelRatio || 1),
+      Math.sqrt(16777216 / (this.pageWidth * this.pageHeight)),
+      8192 / Math.max(this.pageWidth, this.pageHeight)
+    );
+  }
+  queuePageRaster() {
+    if (!this.pageReady || !this.rasterPage || !this.pageCanvas) return;
+    const density = this.pageDensity();
+    if (density === this.requestedDensity) return;
+    this.requestedDensity = density;
+    const revision = ++this.rasterRevision;
+    this.win.clearTimeout(this.rasterTimer);
+    this.rasterTimer = void 0;
+    this.pageTask?.cancel();
+    if (density === this.rasterDensity) return;
+    this.rasterTimer = this.win.setTimeout(() => {
+      this.rasterTimer = void 0;
+      void this.refreshPageRaster(density, revision);
+    }, 120);
+  }
+  async refreshPageRaster(density, revision) {
+    const page = this.rasterPage, previous = this.pageCanvas;
+    if (!page || !previous || !this.pageReady || revision !== this.rasterRevision) return;
+    const canvas = this.win.createEl("canvas");
+    canvas.setAttribute("aria-label", `PDF page ${this.currentPage}`);
+    try {
+      await this.renderCanvas(page, canvas, PDF_SCALE, density, true);
+      if (revision !== this.rasterRevision || previous !== this.pageCanvas) return;
+      previous.replaceWith(canvas);
+      this.pageCanvas = canvas;
+      this.rasterDensity = density;
+    } catch (error) {
+      if (revision !== this.rasterRevision || error instanceof __webpack_exports__RenderingCancelledException) return;
+      this.requestedDensity = this.rasterDensity;
+      console.error("Remark My Words: resolution", error);
+    }
+  }
+  async showPage(pageNumber, edge = "top") {
     if (!this.pdf || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
+    this.resetPageRaster();
     this.currentPage = pageNumber;
     this.pageReady = false;
     this.viewport.scrollTop = 0;
@@ -22966,7 +23075,10 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       const canvas = this.pageEl.createEl("canvas", { attr: { "aria-label": `PDF page ${pageNumber}` } });
       this.renderAnnotations();
       this.fit();
-      await this.renderCanvas(page, canvas, PDF_SCALE, Math.min(this.win.devicePixelRatio || 1, 2), true);
+      this.rasterPage = page;
+      this.pageCanvas = canvas;
+      this.rasterDensity = this.requestedDensity = this.pageDensity();
+      await this.renderCanvas(page, canvas, PDF_SCALE, this.rasterDensity, true);
       if (token !== this.pageGeneration || generation !== this.generation) return;
       const layer = this.pageEl.createDiv({ cls: "pdfaw-textlayer" });
       const content = await page.getTextContent();
@@ -22974,8 +23086,10 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.textLayer = new __webpack_exports__TextLayer({ textContentSource: content, container: layer, viewport });
       await this.textLayer.render();
       if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.pageReady = true;
       this.renderAnnotations();
+      if (this.mode === "reading") this.viewport.scrollTop = edge === "bottom" ? this.viewport.scrollHeight : 0;
+      this.pageReady = true;
+      this.queuePageRaster();
     } catch (error) {
       if (token !== this.pageGeneration || generation !== this.generation) return;
       this.pageEl.createDiv({ cls: "pdfaw-loading pdfaw-error", text: "Could not render this page." });
@@ -23090,7 +23204,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       card.toggleClass("is-active", this.activeId === annotation.id);
       const header = card.createDiv({ cls: "pdfaw-card-header" });
       const badge = header.createDiv({ cls: "pdfaw-badge" });
-      (0, import_obsidian5.setIcon)(badge.createSpan(), category.icon);
+      (0, import_obsidian6.setIcon)(badge.createSpan(), category.icon);
       badge.createSpan({ text: category.label });
       this.button(header, "ellipsis", "Comment actions", () => this.cardMenu(annotation, header));
       header.onpointerdown = (event) => {
@@ -23156,7 +23270,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     void this.save();
   }
   cardMenu(annotation, element) {
-    const menu = new import_obsidian5.Menu();
+    const menu = new import_obsidian6.Menu();
     menu.addItem((item) => item.setTitle("Edit").setIcon("pencil").onClick(() => this.editAnnotation(annotation)));
     menu.addItem((item) => item.setTitle("Go to passage").setIcon("locate").onClick(() => this.focusAnnotation(annotation)));
     menu.addSeparator();
@@ -23174,11 +23288,16 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
   }
   deleteAnnotation(annotation) {
     if (!this.sidecar?.annotations.some((item) => item.id === annotation.id)) return;
-    this.sidecar.annotations = this.sidecar.annotations.filter((item) => item.id !== annotation.id);
-    if (this.activeId === annotation.id) this.activeId = null;
+    const data = this.sidecar;
     this.commentPreview.hide();
-    this.renderAnnotations();
-    void this.save();
+    new DeleteCommentModal(this.app, annotation.title || annotation.comment || annotation.text, this.categories.themeColors(), () => {
+      if (this.sidecar !== data || !data.annotations.some((item) => item.id === annotation.id)) return;
+      data.annotations = data.annotations.filter((item) => item.id !== annotation.id);
+      if (this.activeId === annotation.id) this.activeId = null;
+      this.commentPreview.hide();
+      this.renderAnnotations();
+      void this.save();
+    }).open();
   }
   editAnnotation(annotation) {
     const data = this.sidecar;
@@ -23188,11 +23307,11 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.commentPreview.hide();
       this.renderAnnotations();
       void this.save();
-    }, this.categories.choices(annotation)).open();
+    }, this.categories.choices(annotation), this.categories.themeColors()).open();
   }
   editSelection(category) {
     if (!this.selection || !this.sidecar) {
-      new import_obsidian5.Notice("Select a passage in the PDF first.");
+      new import_obsidian6.Notice("Select a passage in the PDF first.");
       return;
     }
     const selection = this.selection, data = this.sidecar;
@@ -23211,7 +23330,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
       this.renderAnnotations();
       if (this.mode === "canvas") this.fit();
       void this.save();
-    }, this.categories.active()).open();
+    }, this.categories.active(), this.categories.themeColors()).open();
   }
   openCommentAt(event) {
     const press = this.commentPress;
@@ -23425,6 +23544,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
   }
   applyCamera() {
     this.commentPreview.hide();
+    this.queuePageRaster();
     const { x, y, zoom } = this.camera;
     if (this.mode === "reading") {
       this.stage.setCssProps({ "--reading-width": `${this.pageWidth * zoom}px`, "--reading-height": `${this.pageHeight * zoom}px` });
@@ -23482,7 +23602,7 @@ var PdfAnnotatorView = class extends import_obsidian5.FileView {
     }
   }
 };
-var RemarkMyWordsPlugin = class extends import_obsidian5.Plugin {
+var RemarkMyWordsPlugin = class extends import_obsidian6.Plugin {
   async onload() {
     const stored = await this.loadData();
     this.categories = new CategoryStore(readCategorySettings(stored), (categories, theme) => this.saveData({ categories, theme }), readThemeColors(stored));
@@ -23492,7 +23612,7 @@ var RemarkMyWordsPlugin = class extends import_obsidian5.Plugin {
     this.addRibbonIcon("file-pen-line", "Remark My Words", () => this.openPdf());
     this.addSettingTab(new RemarkSettingsTab(this.app, this, this.categories, () => this.openPdf()));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-      if (file instanceof import_obsidian5.TFile && file.extension.toLowerCase() === "pdf") menu.addItem((item) => item.setTitle("Open in Remark My Words").setIcon("file-pen-line").onClick(() => {
+      if (file instanceof import_obsidian6.TFile && file.extension.toLowerCase() === "pdf") menu.addItem((item) => item.setTitle("Open in Remark My Words").setIcon("file-pen-line").onClick(() => {
         void this.app.workspace.getLeaf(false).setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
       }));
     }));
@@ -23503,6 +23623,6 @@ var RemarkMyWordsPlugin = class extends import_obsidian5.Plugin {
     };
     const active = this.app.workspace.getActiveFile();
     if (active?.extension.toLowerCase() === "pdf") open(active);
-    else new PdfPicker(this.app, open).open();
+    else new PdfPicker(this.app, open, this.categories.themeColors()).open();
   }
 };

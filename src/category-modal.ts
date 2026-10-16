@@ -1,5 +1,6 @@
 ﻿import { App, Modal, setIcon } from "obsidian";
 import { CategoryDefinition } from "./model";
+import { applyModalTheme } from "./modal";
 import { CATEGORY_ICONS, CategoryStore, THEME_COLORS, ThemeColors } from "./category-store";
 
 export class CategoryModal extends Modal {
@@ -14,6 +15,7 @@ export class CategoryModal extends Modal {
     super(app); this.draft = store.all(); this.revision = store.revision; this.theme = store.themeColors();
   }
   onOpen() {
+    applyModalTheme(this, this.theme);
     this.setTitle("Customize");
     this.modalEl.addClass("pdfaw-category-modal");
     this.contentEl.createEl("p", { cls: "pdfaw-category-help", text: "Categories apply to every PDF in this vault. Deleted categories remain on existing comments, but cannot be chosen for new comments." });
@@ -25,7 +27,7 @@ export class CategoryModal extends Modal {
       const inputId = `pdfaw-theme-${key}`;
       field.createEl("label", { text: label, attr: { for: inputId } });
       const picker = field.createEl("input", { attr: { id: inputId, type: "color", "aria-label": label } });
-      picker.value = this.theme[key]; picker.oninput = () => { this.theme[key] = picker.value; };
+      picker.value = this.theme[key]; picker.oninput = () => { this.theme[key] = picker.value; applyModalTheme(this, this.theme); };
     }
     const categories = this.contentEl.createDiv({ cls: "pdfaw-category-settings" });
     categories.createEl("h3", { text: "Categories" });

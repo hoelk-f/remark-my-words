@@ -7,6 +7,7 @@ function createEl(tag, options = {}) {
   for (const [key, value] of Object.entries(options.attr ?? {})) element.setAttribute(key, value);
   this.appendChild(element); return element;
 }
+window.createEl = (tag, options) => createEl.call(document.createDocumentFragment(), tag, options);
 Object.assign(Element.prototype, {
   setCssProps(props) { for (const [key, value] of Object.entries(props)) this.style.setProperty(key, value); },
   createEl, createDiv(options) { return createEl.call(this, 'div', options); },
@@ -44,10 +45,10 @@ export class Menu {
   showAtMouseEvent() { window.lastMenu = this; }
 }
 export class Modal {
-  constructor(app) { this.app = app; this.el = document.body.createDiv({ cls: 'modal' }); this.modalEl = this.el; this.contentEl = this.el.createDiv(); }
-  setTitle(text) { this.el.dataset.title = text; }
-  open() { this.onOpen(); }
-  close() { this.onClose?.(); this.el.remove(); }
+  constructor(app) { this.app = app; this.el = document.body.createDiv({ cls: 'modal' }); this.modalEl = this.el; this.contentEl = this.el.createDiv({ cls: 'modal-content' }); this.titleEl = this.el.createDiv({ cls: 'modal-title' }); this.el.prepend(this.titleEl); this.onKey = event => { if (event.key === 'Escape') { event.stopPropagation(); this.close(); } }; }
+  setTitle(text) { this.el.dataset.title = text; this.titleEl.textContent = text; }
+  open() { document.addEventListener("keydown", this.onKey, true); this.onOpen(); }
+  close() { document.removeEventListener("keydown", this.onKey, true); this.onClose?.(); this.el.remove(); }
 }
 export class Setting {
   constructor(parent) { this.el = parent.createDiv({ cls: 'setting-item' }); this.control = this.el.createDiv({ cls: 'setting-item-control' }); }
@@ -55,7 +56,7 @@ export class Setting {
   setDesc() { return this; }
   addText(fn) { const inputEl = this.control.createEl('input'); fn({ inputEl, setValue(value) { inputEl.value = value; return this; }, setPlaceholder(value) { inputEl.placeholder = value; return this; }, onChange(action) { inputEl.oninput = () => action(inputEl.value); return this; } }); return this; }
   addDropdown(fn) { const el = this.control.createEl('select'); fn({ addOption(value, text) { el.createEl('option', { text, attr: { value } }); return this; }, setValue(value) { el.value = value; return this; }, onChange(action) { el.onchange = () => action(el.value); return this; } }); return this; }
-  addButton(fn) { const el = this.control.createEl('button'); fn({ setButtonText(text) { el.textContent = text; return this; }, setCta() { return this; }, onClick(action) { el.onclick = action; return this; } }); return this; }
+  addButton(fn) { const el = this.control.createEl('button'); fn({ setButtonText(text) { el.textContent = text; return this; }, setCta() { el.classList.add("mod-cta"); return this; }, onClick(action) { el.onclick = action; return this; } }); return this; }
 }
 
 export class FuzzySuggestModal extends Modal {

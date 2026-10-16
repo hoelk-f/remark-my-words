@@ -1,14 +1,17 @@
 import { App, Modal, Setting } from "obsidian";
 import { Annotation, Category, CategoryDefinition } from "./model";
+import type { ThemeColors } from "./category-store";
+import { applyModalTheme } from "./modal";
 
 export type CommentDraft = Pick<Annotation, "title" | "comment" | "tags" | "category">;
 
 export class CommentModal extends Modal {
-  constructor(app: App, private draft: CommentDraft, private quote: string, private submit: (draft: CommentDraft) => void, private categories: CategoryDefinition[]) {
+  constructor(app: App, private draft: CommentDraft, private quote: string, private submit: (draft: CommentDraft) => void, private categories: CategoryDefinition[], private theme: ThemeColors) {
     super(app);
   }
 
   onOpen() {
+    applyModalTheme(this, this.theme);
     this.setTitle(this.draft.title ? "Edit comment" : "Add comment");
     this.contentEl.addClass("pdfaw-editor");
     const draft = { ...this.draft };

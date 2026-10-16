@@ -41,7 +41,9 @@ The PDF renderer is bundled with the plugin, so no additional download is needed
 5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. Click outside the preview, press **Escape**, or use its close button to dismiss it. The **Read page comments** button also works with a keyboard or touch input.
 6. In Canvas, drag a card by its header. Double-click it to edit; its **…** menu provides category changes and deletion.
 
-Navigate pages with thumbnails, arrows, or the page number.
+Navigate pages with thumbnails, arrows, or the page number. In Reading, scroll
+past the bottom to open the next page at its top, or past the top to open the
+previous page at its bottom. Deleting a comment asks for confirmation.
 
 ## Customize
 

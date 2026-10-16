@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.14 — 2026-10-16
+- Enter the previous page at its bottom when scrolling upward in Reading mode.
+- Apply the plugin palette to comment, customization, PDF picker, and deletion dialogs; use the same deletion confirmation in Reading and Canvas.
+- Render PDF bitmaps for the current zoom and display density, preserving text selection and highlights while replacing the bitmap without flicker.
+
 ## 0.2.13 — 2026-10-09
 
 - See the GitHub release notes for the included changes.

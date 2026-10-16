@@ -9,6 +9,8 @@ import { CategoryStore, readCategorySettings, readThemeColors } from "./category
 import { CategoryModal } from "./category-modal";
 import { PdfPicker, RemarkSettingsTab } from "./plugin-access";
 import workerSource from "embedded-pdf-worker";
+import { applyThemeColors } from "./theme";
+import { DeleteCommentModal } from "./modal";
 
 const VIEW_TYPE = "pdfaw-view";
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -48,6 +50,12 @@ export class PdfAnnotatorView extends FileView {
   private workerUrl: string | null = null;
   private renderTasks = new Set<RenderTask>();
   private pageTask: RenderTask | null = null;
+  private rasterPage: pdfjs.PDFPageProxy | null = null;
+  private pageCanvas: HTMLCanvasElement | null = null;
+  private rasterDensity = 0;
+  private requestedDensity = 0;
+  private rasterRevision = 0;
+  private rasterTimer: number | undefined;
   private textLayer: pdfjs.TextLayer | null = null;
   private thumbObserver: IntersectionObserver | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -203,13 +211,14 @@ export class PdfAnnotatorView extends FileView {
     this.registerDomEvent(this.viewport, "wheel", event => {
       if ((event.target as HTMLElement).closest(".pdfaw-comment-body")) return;
       if (this.mode === "reading" && !event.ctrlKey && !event.metaKey) {
+        if (this.pageChangePending || !this.pageReady) { event.preventDefault(); return; }
         const atTop = this.viewport.scrollTop <= 2;
         const atBottom = this.viewport.scrollTop + this.viewport.clientHeight >= this.viewport.scrollHeight - 2;
         const nextPage = event.deltaY > 0 && atBottom ? this.currentPage + 1
           : event.deltaY < 0 && atTop ? this.currentPage - 1 : null;
         if (nextPage !== null && nextPage >= 1 && nextPage <= (this.pdf?.numPages ?? 1) && !this.pageChangePending) {
           event.preventDefault(); this.pageChangePending = true;
-          void this.showPage(nextPage).finally(() => { this.pageChangePending = false; });
+          void this.showPage(nextPage, event.deltaY < 0 ? "bottom" : "top").finally(() => { this.pageChangePending = false; });
         }
         return;
       }
@@ -225,7 +234,9 @@ export class PdfAnnotatorView extends FileView {
     });
     this.registerDomEvent(this.root, "keydown", event => this.onKey(event));
     this.registerDomEvent(this.contentEl.ownerDocument, "keydown", event => { if (event.key === "Escape") this.commentPreview.hide(); });
+    this.registerDomEvent(this.win, "resize", () => this.queuePageRaster());
     this.resizeObserver = new ResizeObserver(entries => {
+      this.queuePageRaster();
       if (this.mode === "reading") {
         // Rebuilding hidden canvas cards also sends resize notifications.
         // Only a viewport resize changes the Reading layout or its previews.
@@ -238,11 +249,7 @@ export class PdfAnnotatorView extends FileView {
 
   private menuPosition(el: HTMLElement) { const box = el.getBoundingClientRect(); return { x: box.left, y: box.bottom }; }
   private applyTheme() {
-    const theme = this.categories.themeColors();
-    this.root.setCssProps({
-      "--pdfaw-bg": theme.background, "--pdfaw-panel": theme.panel, "--pdfaw-border": theme.border,
-      "--pdfaw-text": theme.text, "--pdfaw-muted": theme.muted, "--pdfaw-accent": theme.accent,
-    });
+    applyThemeColors(this.root, this.categories.themeColors());
   }
 
   async onLoadFile(file: TFile) {
@@ -289,7 +296,7 @@ export class PdfAnnotatorView extends FileView {
   private releaseDocument() {
     this.commentPreview.hide();
     this.selectionPointer = null; this.commentPress = null; this.pageChangePending = false;
-    this.generation++; this.pageGeneration++;
+    this.generation++; this.pageGeneration++; this.resetPageRaster();
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
     this.renderTasks.clear(); this.pageTask = null;
@@ -326,13 +333,56 @@ export class PdfAnnotatorView extends FileView {
     canvas.width = Math.ceil(viewport.width * density); canvas.height = Math.ceil(viewport.height * density);
     canvas.setCssProps({ "--canvas-width": `${viewport.width}px`, "--canvas-height": `${viewport.height}px` });
     const context = canvas.getContext("2d"); if (!context) throw new Error("Canvas unavailable.");
-    const task = page.render({ canvasContext: context, viewport, transform: density === 1 ? undefined : [density, 0, 0, density, 0, 0] });
+    const task = page.render({ canvasContext: context, viewport, transform: [canvas.width / viewport.width, 0, 0, canvas.height / viewport.height, 0, 0] });
     if (main) this.pageTask = task;
     this.renderTasks.add(task);
     try { await task.promise; } finally { this.renderTasks.delete(task); if (this.pageTask === task) this.pageTask = null; }
   }
-  private async showPage(pageNumber: number) {
+  private resetPageRaster() {
+    this.win.clearTimeout(this.rasterTimer); this.rasterTimer = undefined;
+    this.rasterRevision++; this.pageTask?.cancel();
+    this.rasterPage = null; this.pageCanvas = null;
+    this.rasterDensity = 0; this.requestedDensity = 0;
+  }
+  private pageDensity() {
+    // Match the displayed size in physical pixels, with a memory/dimension cap
+    // for oversized pages and high zoom on high-density displays.
+    return Math.min(this.camera.zoom * (this.win.devicePixelRatio || 1),
+      Math.sqrt(16_777_216 / (this.pageWidth * this.pageHeight)), 8192 / Math.max(this.pageWidth, this.pageHeight));
+  }
+  private queuePageRaster() {
+    if (!this.pageReady || !this.rasterPage || !this.pageCanvas) return;
+    const density = this.pageDensity();
+    if (density === this.requestedDensity) return;
+    this.requestedDensity = density;
+    const revision = ++this.rasterRevision;
+    this.win.clearTimeout(this.rasterTimer); this.rasterTimer = undefined;
+    this.pageTask?.cancel();
+    if (density === this.rasterDensity) return;
+    this.rasterTimer = this.win.setTimeout(() => {
+      this.rasterTimer = undefined;
+      void this.refreshPageRaster(density, revision);
+    }, 120);
+  }
+  private async refreshPageRaster(density: number, revision: number) {
+    const page = this.rasterPage, previous = this.pageCanvas;
+    if (!page || !previous || !this.pageReady || revision !== this.rasterRevision) return;
+    const canvas = this.win.createEl("canvas");
+    canvas.setAttribute("aria-label", `PDF page ${this.currentPage}`);
+    try {
+      // Keep the current bitmap and text layer intact while the new one renders.
+      await this.renderCanvas(page, canvas, PDF_SCALE, density, true);
+      if (revision !== this.rasterRevision || previous !== this.pageCanvas) return;
+      previous.replaceWith(canvas); this.pageCanvas = canvas; this.rasterDensity = density;
+    } catch (error) {
+      if (revision !== this.rasterRevision || error instanceof pdfjs.RenderingCancelledException) return;
+      this.requestedDensity = this.rasterDensity;
+      console.error("Remark My Words: resolution", error);
+    }
+  }
+  private async showPage(pageNumber: number, edge: "top" | "bottom" = "top") {
     if (!this.pdf || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
+    this.resetPageRaster();
     this.currentPage = pageNumber; this.pageReady = false; this.viewport.scrollTop = 0; this.viewport.scrollLeft = 0;
     const token = ++this.pageGeneration, generation = this.generation;
     this.pageTask?.cancel(); this.textLayer?.cancel(); this.clearSelection();
@@ -350,7 +400,9 @@ export class PdfAnnotatorView extends FileView {
       this.pageEl.style.setProperty("--scale-factor", String(PDF_SCALE)); this.pageEl.dataset.page = String(pageNumber);
       const canvas = this.pageEl.createEl("canvas", { attr: { "aria-label": `PDF page ${pageNumber}` } });
       this.renderAnnotations(); this.fit();
-      await this.renderCanvas(page, canvas, PDF_SCALE, Math.min(this.win.devicePixelRatio || 1, 2), true);
+      this.rasterPage = page; this.pageCanvas = canvas;
+      this.rasterDensity = this.requestedDensity = this.pageDensity();
+      await this.renderCanvas(page, canvas, PDF_SCALE, this.rasterDensity, true);
       if (token !== this.pageGeneration || generation !== this.generation) return;
       const layer = this.pageEl.createDiv({ cls: "pdfaw-textlayer" });
       const content = await page.getTextContent();
@@ -358,7 +410,9 @@ export class PdfAnnotatorView extends FileView {
       this.textLayer = new pdfjs.TextLayer({ textContentSource: content, container: layer, viewport });
       await this.textLayer.render();
       if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.pageReady = true; this.renderAnnotations();
+      this.renderAnnotations();
+      if (this.mode === "reading") this.viewport.scrollTop = edge === "bottom" ? this.viewport.scrollHeight : 0;
+      this.pageReady = true; this.queuePageRaster();
     } catch (error) {
       if (token !== this.pageGeneration || generation !== this.generation) return;
       this.pageEl.createDiv({ cls: "pdfaw-loading pdfaw-error", text: "Could not render this page." });
@@ -503,16 +557,21 @@ export class PdfAnnotatorView extends FileView {
   }
   private deleteAnnotation(annotation: Annotation) {
     if (!this.sidecar?.annotations.some(item => item.id === annotation.id)) return;
-    this.sidecar.annotations = this.sidecar.annotations.filter(item => item.id !== annotation.id);
-    if (this.activeId === annotation.id) this.activeId = null;
-    this.commentPreview.hide(); this.renderAnnotations(); void this.save();
+    const data = this.sidecar;
+    this.commentPreview.hide();
+    new DeleteCommentModal(this.app, annotation.title || annotation.comment || annotation.text, this.categories.themeColors(), () => {
+      if (this.sidecar !== data || !data.annotations.some(item => item.id === annotation.id)) return;
+      data.annotations = data.annotations.filter(item => item.id !== annotation.id);
+      if (this.activeId === annotation.id) this.activeId = null;
+      this.commentPreview.hide(); this.renderAnnotations(); void this.save();
+    }).open();
   }
   private editAnnotation(annotation: Annotation) {
     const data = this.sidecar;
     new CommentModal(this.app, annotation, annotation.text, draft => {
       if (this.sidecar !== data) return;
       Object.assign(annotation, draft, { color: this.categories.style(draft.category, annotation.categoryStyle).color, categoryStyle: this.categories.style(draft.category, annotation.categoryStyle), updatedAt: Date.now() }); this.commentPreview.hide(); this.renderAnnotations(); void this.save();
-    }, this.categories.choices(annotation)).open();
+    }, this.categories.choices(annotation), this.categories.themeColors()).open();
   }
   private editSelection(category: Category) {
     if (!this.selection || !this.sidecar) { new Notice("Select a passage in the PDF first."); return; }
@@ -524,7 +583,7 @@ export class PdfAnnotatorView extends FileView {
       data.annotations.push({ id: crypto.randomUUID(), ...selection, ...draft, color: this.categories.style(draft.category).color, categoryStyle: this.categories.style(draft.category), createdAt: now, updatedAt: now });
       if (this.filter && this.filter !== draft.category) { this.filter = null; this.renderFilters(); }
       this.clearSelection(); this.win.getSelection()?.removeAllRanges(); this.renderAnnotations(); if (this.mode === "canvas") this.fit(); void this.save();
-    }, this.categories.active()).open();
+    }, this.categories.active(), this.categories.themeColors()).open();
   }
   private openCommentAt(event: MouseEvent) {
     const press = this.commentPress; this.commentPress = null;
@@ -678,6 +737,7 @@ export class PdfAnnotatorView extends FileView {
   }
   private applyCamera() {
     this.commentPreview.hide();
+    this.queuePageRaster();
     const { x, y, zoom } = this.camera;
     if (this.mode === "reading") {
       this.stage.setCssProps({ "--reading-width": `${this.pageWidth * zoom}px`, "--reading-height": `${this.pageHeight * zoom}px` });
@@ -737,6 +797,6 @@ export default class RemarkMyWordsPlugin extends Plugin {
     const open = (file: TFile) => { void this.app.workspace.getLeaf(false).setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true }); };
     const active = this.app.workspace.getActiveFile();
     if (active?.extension.toLowerCase() === "pdf") open(active);
-    else new PdfPicker(this.app, open).open();
+    else new PdfPicker(this.app, open, this.categories.themeColors()).open();
   }
 }

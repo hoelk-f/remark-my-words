@@ -1,4 +1,5 @@
 import { testCategories } from "./category-browser.mjs";
+import { testRendering } from "./rendering-browser.mjs";
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
@@ -36,7 +37,7 @@ function fixturePdf() {
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 7 0 R >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 8 0 R >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 8 0 R >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>',
     `<< /Length ${stream.length} >>\nstream\n${stream}endstream`,
@@ -48,7 +49,7 @@ function fixturePdf() {
   pdf += `xref\n0 9\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 9 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
   return Buffer.from(pdf);
 }
-const html = `<!DOCTYPE html><html><meta charset="UTF-8"><style>html,body,#app{height:100%;margin:0}body{--font-interface:Arial,sans-serif;font-family:Arial,sans-serif}button,input,textarea,select{font:inherit}button{border:1px solid #424855;border-radius:5px} .modal{position:fixed;inset:15% 28%;z-index:100;background:#242832;color:white;padding:25px;border:1px solid #777;border-radius:12px;overflow:auto}.setting-item{display:flex;justify-content:space-between;padding:12px 0}.setting-item-control{order:1;display:flex;gap:8px}</style><link rel="stylesheet" href="/styles.css"><div id="app"></div><script type="module" src="/bundle.js"></script></html>`;
+const html = `<!DOCTYPE html><html><meta charset="UTF-8"><style>html,body,#app{height:100%;margin:0}body{--font-interface:Arial,sans-serif;font-family:Arial,sans-serif}button,input,textarea,select{font:inherit}button{border:1px solid #424855;border-radius:5px} .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;background:#242832;color:white;padding:25px;border:1px solid #777;border-radius:12px;overflow:auto}.setting-item{display:flex;justify-content:space-between;padding:12px 0}.setting-item-control{order:1;display:flex;gap:8px}</style><link rel="stylesheet" href="/styles.css"><div id="app"></div><script type="module" src="/bundle.js"></script></html>`;
 const routes = new Map([
   ['/', ['text/html', html]], ['/bundle.js', ['text/javascript', bundle.outputFiles[0].contents]],
   ['/styles.css', ['text/css', await readFile(path.join(root, 'styles.css'))]],
@@ -187,7 +188,20 @@ try {
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).category'), 'claim');
   await evaluate(`document.querySelector('.pdfaw-card-header button').click();lastMenu.items.find(item=>item.text==='Concept').action();view.saveQueue`);
   assert.equal(await evaluate('view.sidecar.annotations[0].category'), 'concept');
-  await evaluate(`document.querySelector('.pdfaw-card-header button').click();lastMenu.items.find(item=>item.text==='Delete comment').action();view.saveQueue`);
+  await evaluate(`document.querySelector('.pdfaw-card-header button').click();lastMenu.items.find(item=>item.text==='Delete comment').action()`);
+  assert.equal(await evaluate('view.sidecar.annotations.length'), 7, 'Opening the deletion dialog does not remove a comment');
+  assert.equal(await evaluate('document.activeElement.textContent'), 'Cancel', 'Deletion initially focuses Cancel');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".pdfaw-delete-modal")).backgroundColor'), 'rgb(30, 30, 30)', 'Deletion uses the plugin panel color');
+  const deleteShot = await cdp('Page.captureScreenshot', { format: 'png' });
+  await writeFile(path.join(artifacts, 'delete-dialog.png'), Buffer.from(deleteShot.data, 'base64'));
+  await evaluate(`document.querySelector('.pdfaw-delete-modal button').click()`);
+  assert.equal(await evaluate('view.sidecar.annotations.length'), 7, 'Cancel keeps the comment');
+  await evaluate('view.deleteAnnotation(view.sidecar.annotations[0])');
+  await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
+  assert.equal(await evaluate('document.querySelector(".pdfaw-delete-modal")'), null, 'Escape dismisses deletion');
+  assert.equal(await evaluate('view.sidecar.annotations.length'), 7, 'Escape keeps the comment');
+  await evaluate(`view.deleteAnnotation(view.sidecar.annotations[0]);document.querySelector('.pdfaw-delete-modal .mod-warning').click();view.saveQueue`);
   assert.equal(await evaluate('view.sidecar.annotations.length'), 6);
   await evaluate(`document.querySelector('.pdfaw-comment-card').focus();document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));view.saveQueue`);
   await evaluate('view.showPage(2)');
@@ -204,7 +218,11 @@ try {
   assert.equal(await evaluate('view.viewport.scrollTop'), 0, 'Scrolling past the bottom opens the next page at the top');
   await evaluate('view.viewport.scrollTop = 0; view.viewport.dispatchEvent(new WheelEvent("wheel",{deltaY:-700,bubbles:true,cancelable:true}))');
   await until('view.currentPage === 1 && view.pageReady');
-  assert.equal(await evaluate('view.viewport.scrollTop'), 0, 'Scrolling past the top opens the previous page at the top');
+  assert.ok(await evaluate('view.viewport.scrollTop > 0 && Math.abs(view.viewport.scrollTop + view.viewport.clientHeight - view.viewport.scrollHeight) <= 1'), 'Scrolling past the top opens the previous page at the bottom');
+  await evaluate('view.showPage(1)');
+  assert.equal(await evaluate('view.viewport.scrollTop'), 0, 'Direct navigation still starts at the top');
+  await evaluate('view.viewport.dispatchEvent(new WheelEvent("wheel",{deltaY:-700,bubbles:true,cancelable:true}))');
+  assert.equal(await evaluate('view.currentPage'), 1, 'Cannot scroll before the first page');
   await evaluate('view.viewport.scrollTop = 180');
   const scrollBefore = await evaluate('view.viewport.scrollTop');
   assert.ok(scrollBefore > 0, 'Reading mode scrolls naturally');
@@ -282,13 +300,10 @@ try {
   assert.equal(await evaluate('document.activeElement.className'), 'pdfaw-comment-preview', 'Opening page comments focuses the preview');
   const annotationsBeforePreviewDelete = await evaluate('view.sidecar.annotations.length');
   await evaluate(`(() => {
-    const confirm = window.confirm;
-    try {
-      window.confirm = () => true;
-      document.querySelector('.pdfaw-preview-actions button[aria-label="Delete comment"]').click();
-      window.previewClosedAfterDelete = document.querySelector('.pdfaw-comment-preview').hidden;
-      document.querySelector('.pdfaw-read-comments').click();
-    } finally { window.confirm = confirm; }
+    document.querySelector('.pdfaw-preview-actions button[aria-label="Delete comment"]').click();
+    document.querySelector('.pdfaw-delete-modal .mod-warning').click();
+    window.previewClosedAfterDelete = document.querySelector('.pdfaw-comment-preview').hidden;
+    document.querySelector('.pdfaw-read-comments').click();
     return view.saveQueue;
   })()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
@@ -342,6 +357,11 @@ try {
     assert.ok(await evaluate(`(() => { const r=view.selectionBar.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth; })()`), `Selection toolbar stays on screen at ${width}px`);
   }
   await testCategories({evaluate, until, cdp});
+  await testRendering({evaluate, until, cdp});
+  await evaluate(`view.deleteAnnotation(view.sidecar.annotations[0]);view.onLoadFile(new TFile('Forschungspapier.pdf'))`);
+  const annotationsAfterReload = await evaluate('view.sidecar.annotations.length');
+  await evaluate(`document.querySelector('.pdfaw-delete-modal .mod-warning').click();view.saveQueue`);
+  assert.equal(await evaluate('view.sidecar.annotations.length'), annotationsAfterReload, 'A stale deletion dialog cannot change a reloaded document');
   await evaluate(`view.noteInput.value='Notiz vor Dokumentwechsel';view.noteInput.dispatchEvent(new Event('input'));view.onLoadFile(new TFile('Andere.pdf'))`);
   assert.equal(await evaluate('JSON.parse(storage.get("Forschungspapier.pdf.obsidian-annot.json")).notes'), 'Notiz vor Dokumentwechsel');
   assert.equal(await evaluate('view.sidecar.notes'), '');

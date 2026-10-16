@@ -29,7 +29,13 @@ installable files into `dist/remark-my-words/`. No npm publication is needed.
 - `tests/`: model and browser integration tests.
 
 PDF coordinates use a fixed scale of 1.35. Camera zoom is separate, so changing
-the display does not change saved highlights or card positions. Rendering tasks
+the display does not change saved highlights or card positions. The PDF bitmap
+is rendered at the current camera zoom times the display's pixel density, with
+limits of approximately 16 megapixels and 8192 pixels per side. Zoom changes are
+debounced for 120 ms; a completed bitmap replaces the previous one without
+rebuilding the text layer or selection. Stale renders are canceled when zoom,
+page, or document changes. Dialogs share the view's configured theme colors.
+Rendering tasks
 are canceled when pages or documents change. Each view creates a local Blob URL
 for the bundled worker and revokes it when the view closes.
 

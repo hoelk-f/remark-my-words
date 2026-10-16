@@ -5,7 +5,6 @@ import { Annotation, CategoryStyle } from "./model";
 export class CommentPreview {
   private el: HTMLDivElement;
   private returnFocus: HTMLElement | null = null;
-  private get win() { return this.root.ownerDocument.defaultView!; }
 
   constructor(
     private root: HTMLElement,
@@ -45,7 +44,6 @@ export class CommentPreview {
       const remove = actions.createEl("button", { text: "Delete", attr: { type: "button", "aria-label": "Delete comment" } });
       setIcon(remove, "trash-2");
       remove.onclick = () => {
-        if (!this.win.confirm("Delete this comment?")) return;
         this.hide(); this.actions.remove(annotation);
       };
     }

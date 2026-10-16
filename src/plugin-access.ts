@@ -1,11 +1,13 @@
 ﻿import { App, FuzzySuggestModal, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
-import { CategoryStore } from "./category-store";
+import { CategoryStore, ThemeColors } from "./category-store";
+import { applyModalTheme } from "./modal";
 import { CategoryModal } from "./category-modal";
 
 export class PdfPicker extends FuzzySuggestModal<TFile> {
-  constructor(app: App, private choose: (file: TFile) => void) {
+  constructor(app: App, private choose: (file: TFile) => void, private theme: ThemeColors) {
     super(app); this.setPlaceholder("Choose a PDF from this vault");
   }
+  async onOpen() { applyModalTheme(this, this.theme); await super.onOpen(); }
   getItems() { return this.app.vault.getFiles().filter(file => file.extension.toLowerCase() === "pdf").sort((a, b) => a.path.localeCompare(b.path)); }
   getItemText(file: TFile) { return file.path; }
   onChooseItem(file: TFile) { this.choose(file); }

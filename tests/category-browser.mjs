@@ -4,6 +4,7 @@ export async function testCategories({evaluate, until, cdp}) {
   assert.ok(await evaluate(`plugin.commands.some(c=>c.id==='open-pdf-in-annotator' && typeof c.callback==='function' && !c.checkCallback)`), 'Open command is available without an active PDF');
   await evaluate(`plugin.commands.find(c=>c.id==='open-pdf-in-annotator').callback()`);
   assert.deepEqual(await evaluate('lastPicker.items.map(f=>f.path)'), ['Forschungspapier.pdf']);
+  assert.equal(await evaluate('lastPicker.modalEl.classList.contains("pdfaw-modal")'), true, 'PDF picker uses the plugin dialog theme');
   await evaluate('lastPicker.onChooseItem(lastPicker.items[0]);lastPicker.close()');
   assert.equal(await evaluate('openedState.state.file'),'Forschungspapier.pdf');
   await evaluate(`window.activeFile=new TFile('Forschungspapier.pdf');plugin.ribbon[0].callback();window.activeFile=null`);
@@ -13,6 +14,7 @@ export async function testCategories({evaluate, until, cdp}) {
   const click = text => evaluate(`[...document.querySelectorAll('.pdfaw-category-modal button')].find(b=>b.textContent===${JSON.stringify(text)}).click()`);
   const name = (id,value) => evaluate(`(() => { const input=document.querySelector('[data-category-id="${id}"] input[type="text"]');input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('input')); })()`);
   await open();
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".pdfaw-category-modal")).backgroundColor'),'rgb(30, 30, 30)','Customize uses the plugin panel color');
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-category-row").length'),6);
   assert.equal(await evaluate('document.querySelector("#pdfaw-theme-accent").value'),'#960000');
   await name('claim','Discard this'); await click('Cancel');
@@ -36,6 +38,8 @@ export async function testCategories({evaluate, until, cdp}) {
   assert.equal(await evaluate('(async()=> (await reloadCategories()).find(x=>x.label==="Hypothesis").hex)()'),'#aa3366');
   assert.equal(await evaluate('pluginData.theme.accent'),'#b54cff');
   await evaluate(`(() => {const span=document.querySelector('.pdfaw-textlayer span');const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);view.captureSelection();document.querySelector('.pdfaw-selection-toolbar button[aria-label="Hypothesis"]').click();})()`);
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".modal")).getPropertyValue("--pdfaw-accent").trim()'),'#b54cff','Comment editor inherits the customized accent');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".pdfaw-editor-body")).backgroundColor'),'rgb(11, 15, 14)','Comment fields inherit the customized background');
   assert.equal(await evaluate('document.querySelector(".modal select").value'),id);
   await evaluate(`(() => {const body=document.querySelector('.pdfaw-editor-body');body.value='Custom category comment';body.dispatchEvent(new Event('input'));[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click();return view.saveQueue;})()`);
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).category'),id);
