@@ -77,7 +77,7 @@ Test the built plugin in actual Obsidian before running the publication command:
 
 1. Run `npm run package:release` and install only `main.js`, `manifest.json`, and `styles.css` from `dist/remark-my-words/` into a test vault's `.obsidian/plugins/remark-my-words/` folder.
 2. Check offline PDF loading, selection, creating/editing/deleting comments, hover previews, both modes, reopening annotations, document notes, multiple views, and disabling/re-enabling the plugin.
-3. Check Windows, macOS, and Linux before claiming support for each platform. The manifest targets desktop with `1.13.7` as a conservative minimum; browser tests do not certify that minimum in the Obsidian host. Lower it only after testing, and enable mobile only after testing there.
+3. Check Windows, macOS, and Linux before claiming support for each platform. The minimum Obsidian version is `1.13.7`; browser tests do not certify that minimum in the Obsidian host. Mobile installation is enabled for user testing, with iOS/iPadOS `17.4` or later required by the bundled PDF renderer. Keep the mobile-testing qualification until the native apps have been verified, including text selection, the software keyboard, vault persistence, and touch gestures.
 4. Review [Obsidian's developer policies](https://docs.obsidian.md/community-directory/developer-policies) and [submission requirements](https://docs.obsidian.md/community-directory/submission-requirements-for-plugins).
 
 The PDF.js worker is bundled inside `main.js` because Obsidian's installer uses

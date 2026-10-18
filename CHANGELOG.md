@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.15 — 2026-10-18
+- Enable mobile installation for testing in Obsidian on iPhone, iPad, and Android. Mobile app compatibility is still being verified; iOS/iPadOS 17.4 or later is required for the bundled PDF renderer.
+- Add two-finger pinch zoom in Canvas and Reading modes, keeping the PDF point under the finger midpoint and preserving one-finger scrolling and hand-tool panning.
+- Cover zoom limits, canceled gestures, remaining and additional fingers, and page/mode changes with browser touch regression tests.
+- Document that changing pages by touch uses the page controls; swiping past the page boundary does not turn the page.
+
 ## 0.2.14 — 2026-10-16
 - Enter the previous page at its bottom when scrolling upward in Reading mode.
 - Apply the plugin palette to comment, customization, PDF picker, and deletion dialogs; use the same deletion confirmation in Reading and Canvas.

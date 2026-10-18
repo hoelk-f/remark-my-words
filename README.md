@@ -26,8 +26,11 @@ Page thumbnails and document-wide notes are included.
 
 ## Install
 
-Initial release target: **Obsidian Desktop 1.13.7 or later**, using an up-to-date
-Obsidian installer. Mobile support is not enabled for the initial release.
+Requires **Obsidian 1.13.7 or later**, using an up-to-date app or desktop installer.
+Mobile installation is enabled for testing. iPhone/iPad testing requires iOS/iPadOS
+17.4 or later; compatibility with the actual Obsidian mobile app is still being
+verified. Browser simulations cover PDF rendering and basic comment workflows,
+but do not certify native text selection, the on-screen keyboard, or vault storage.
 
 Install **Remark My Words** from **Settings → Community plugins → Browse**.
 The PDF renderer is bundled with the plugin, so no additional download is needed.
@@ -41,9 +44,10 @@ The PDF renderer is bundled with the plugin, so no additional download is needed
 5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. Click outside the preview, press **Escape**, or use its close button to dismiss it. The **Read page comments** button also works with a keyboard or touch input.
 6. In Canvas, drag a card by its header. Double-click it to edit; its **…** menu provides category changes and deletion.
 
-Navigate pages with thumbnails, arrows, or the page number. In Reading, scroll
-past the bottom to open the next page at its top, or past the top to open the
-previous page at its bottom. Deleting a comment asks for confirmation.
+Navigate pages with thumbnails, arrows, or the page number. In Reading, mouse-wheel
+scrolling past the bottom opens the next page at its top, or past the top opens the
+previous page at its bottom. On touchscreens, use the page controls to change pages.
+Deleting a comment asks for confirmation.
 
 ## Customize
 
@@ -81,6 +85,10 @@ sync these files; the plugin does not provide its own synchronization.
 
 ## Keyboard shortcuts
 
+On touchscreens, spread or pinch two fingers over the PDF or canvas to zoom in
+or out around their midpoint. In Reading mode, one finger still scrolls the
+page; in Canvas mode, use the hand tool to pan with one finger.
+
 | Shortcut | Action |
 | --- | --- |
 | V / H | Select text / pan canvas |
@@ -99,7 +107,7 @@ sync these files; the plugin does not provide its own synchronization.
 - Scanned documents need an existing text layer; OCR is not included.
 - Annotations live in the JSON file, not as native annotations inside the PDF.
 - Concurrent edits to the same PDF from multiple views or devices are not merged.
-- The initial release targets desktop. Automated browser tests do not replace testing in Obsidian, and mobile compatibility has not been verified.
+- Mobile installation is available for testing; compatibility in the actual Obsidian iOS and Android apps has not yet been verified.
 
 ## Feedback and development
 

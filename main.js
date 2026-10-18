@@ -22648,6 +22648,8 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
     this.selectionDrag = null;
     this.activeId = null;
     this.gesture = null;
+    this.pinch = null;
+    this.pinchActive = false;
     this.pageReady = false;
     this.geometryFrame = 0;
   }
@@ -22761,6 +22763,16 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
     this.status = status;
     this.saveStatus = status.createSpan({ text: "" });
     this.setTool("select");
+    this.registerDomEvent(this.viewport, "touchstart", (event) => this.startPinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "touchmove", (event) => this.movePinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "touchend", (event) => this.endPinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "touchcancel", (event) => this.endPinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "pointerdown", (event) => {
+      if (this.pinchActive && event.pointerType === "touch") {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, { capture: true });
     this.registerDomEvent(this.viewport, "pointerdown", (event) => this.startPan(event));
     this.registerDomEvent(this.pageEl, "pointerdown", (event) => {
       if (event.button === 0 && this.tool === "select" && this.pageReady) this.selectionPointer = event.pointerId;
@@ -22830,6 +22842,10 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
       }
     }, { passive: false });
     this.registerDomEvent(this.pageEl, "contextmenu", (event) => {
+      if (this.pinchActive) {
+        event.preventDefault();
+        return;
+      }
       this.captureSelection();
       if (!this.selection) return;
       event.preventDefault();
@@ -22923,6 +22939,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
     this.workerUrl = null;
   }
   releaseDocument() {
+    this.resetPinch();
     this.commentPreview.hide();
     this.selectionPointer = null;
     this.commentPress = null;
@@ -23041,6 +23058,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
   }
   async showPage(pageNumber, edge = "top") {
     if (!this.pdf || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
+    this.resetPinch();
     this.resetPageRaster();
     this.currentPage = pageNumber;
     this.pageReady = false;
@@ -23335,7 +23353,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
   openCommentAt(event) {
     const press = this.commentPress;
     this.commentPress = null;
-    if (this.mode !== "reading" || !this.pageReady || event.button !== 0 || event.detail !== 1 || !press || press.dragged) return;
+    if (this.pinchActive || this.mode !== "reading" || !this.pageReady || event.button !== 0 || event.detail !== 1 || !press || press.dragged) return;
     this.captureSelection();
     if (this.selectionPointer !== null || this.selection) return;
     const box = this.pageEl.getBoundingClientRect(), zoom = this.camera.zoom;
@@ -23346,7 +23364,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
     this.commentPreview.show(matches, { left: box.left + quad2.x * zoom, top: box.top + quad2.y * zoom, bottom: box.top + (quad2.y + quad2.h) * zoom }, this.root);
   }
   captureSelection() {
-    if (this.tool !== "select" || !this.pageReady) return;
+    if (this.pinchActive || this.tool !== "select" || !this.pageReady) return;
     const selection = this.win.getSelection();
     if (!selection?.rangeCount || selection.isCollapsed || !selection.toString().trim()) {
       this.clearSelection();
@@ -23444,6 +23462,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
     }
   }
   startPan(event) {
+    if (this.pinchActive) return;
     this.commentPreview.hide();
     if (this.mode === "reading") {
       if (!event.target.closest(".pdfaw-selection-toolbar")) this.clearSelection();
@@ -23463,6 +23482,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
     this.viewport.addClass("is-panning");
   }
   moveGesture(event) {
+    if (this.pinchActive) return;
     const gesture = this.gesture;
     if (!gesture || gesture.pointer !== event.pointerId) return;
     const dx = event.clientX - gesture.start.x, dy = event.clientY - gesture.start.y;
@@ -23481,13 +23501,85 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
   endGesture(event) {
     const gesture = this.gesture;
     if (!gesture || gesture.pointer !== event.pointerId) return;
-    if (gesture.element.hasPointerCapture(event.pointerId)) gesture.element.releasePointerCapture(event.pointerId);
+    this.stopGesture();
+  }
+  stopGesture() {
+    const gesture = this.gesture;
+    if (!gesture) return;
+    if (gesture.element.hasPointerCapture(gesture.pointer)) gesture.element.releasePointerCapture(gesture.pointer);
     if (gesture.card) {
       this.cards.get(gesture.card.id)?.removeClass("is-dragging");
       void this.save();
     }
     this.viewport.removeClass("is-panning");
     this.gesture = null;
+  }
+  pinchTouches(event) {
+    return Array.from(event.touches).filter((touch) => {
+      const target = touch.target;
+      return this.viewport.contains(target) && !target.closest("button, input, textarea, select, .pdfaw-filters, .pdfaw-selection-toolbar");
+    });
+  }
+  startPinch(event) {
+    const touches = this.pinchTouches(event);
+    if (this.pinchActive && event.cancelable) event.preventDefault();
+    if (this.pinch || touches.length < 2 || !this.pageReady || !event.cancelable) return;
+    const [a, b] = touches;
+    const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    if (distance < 1) return;
+    event.preventDefault();
+    this.stopGesture();
+    this.commentPreview.hide();
+    this.selectionPointer = null;
+    this.commentPress = null;
+    this.clearSelection();
+    this.win.getSelection()?.removeAllRanges();
+    const page = this.pageEl.getBoundingClientRect(), zoom = this.camera.zoom;
+    this.pinch = { ids: [a.identifier, b.identifier], distance, zoom, anchor: {
+      x: ((a.clientX + b.clientX) / 2 - page.left) / zoom,
+      y: ((a.clientY + b.clientY) / 2 - page.top) / zoom
+    } };
+    this.pinchActive = true;
+  }
+  movePinch(event) {
+    if (!this.pinchActive) return;
+    if (event.cancelable) event.preventDefault();
+    const pinch = this.pinch;
+    if (!pinch) return;
+    const touches = Array.from(event.touches);
+    const a = touches.find((touch) => touch.identifier === pinch.ids[0]);
+    const b = touches.find((touch) => touch.identifier === pinch.ids[1]);
+    if (!a || !b) return;
+    const center = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+    const zoom = Math.max(0.1, Math.min(3, pinch.zoom * Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) / pinch.distance));
+    this.camera.zoom = zoom;
+    if (this.mode === "reading") {
+      this.applyCamera();
+      const page = this.pageEl.getBoundingClientRect();
+      this.viewport.scrollLeft += page.left + pinch.anchor.x * zoom - center.x;
+      this.viewport.scrollTop += page.top + pinch.anchor.y * zoom - center.y;
+    } else {
+      const viewport = this.viewport.getBoundingClientRect();
+      this.camera.x = center.x - viewport.left - pinch.anchor.x * zoom;
+      this.camera.y = center.y - viewport.top - pinch.anchor.y * zoom;
+      this.applyCamera();
+    }
+  }
+  endPinch(event) {
+    if (!this.pinchActive) return;
+    if (event.cancelable) event.preventDefault();
+    const touches = this.pinchTouches(event);
+    if (!touches.length) {
+      this.resetPinch();
+      return;
+    }
+    if (this.pinch?.ids.every((id) => touches.some((touch) => touch.identifier === id))) return;
+    this.pinch = null;
+    if (event.type !== "touchcancel") this.startPinch(event);
+  }
+  resetPinch() {
+    this.pinch = null;
+    this.pinchActive = false;
   }
   cardBounds() {
     return this.visibleAnnotations().map((annotation) => ({ ...this.position(annotation), width: CARD_WIDTH, height: this.cards.get(annotation.id)?.offsetHeight || 220 }));
@@ -23497,6 +23589,7 @@ var PdfAnnotatorView = class extends import_obsidian6.FileView {
   }
   setMode(mode) {
     if (mode === this.mode) return;
+    this.resetPinch();
     this.commentPress = null;
     this.clearSelection();
     this.win.getSelection()?.removeAllRanges();

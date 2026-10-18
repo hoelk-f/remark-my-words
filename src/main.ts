@@ -79,6 +79,8 @@ export class PdfAnnotatorView extends FileView {
   private selectionDrag: { pointer: number; start: Point; origin: Point } | null = null;
   private activeId: string | null = null;
   private gesture: { pointer: number; start: Point; origin: Point; card?: Annotation; element: HTMLElement } | null = null;
+  private pinch: { ids: number[]; distance: number; zoom: number; anchor: Point } | null = null;
+  private pinchActive = false;
   private pageReady = false;
   private geometryFrame = 0;
 
@@ -173,6 +175,15 @@ export class PdfAnnotatorView extends FileView {
     const status = this.root.createDiv({ cls: "pdfaw-status", attr: { hidden: "true", "aria-live": "polite" } });
     this.status = status; this.saveStatus = status.createSpan({ text: "" });
     this.setTool("select");
+    // Touch events let us claim two fingers without disabling native one-finger
+    // scrolling/selection in Reading mode (which cancels pointer events).
+    this.registerDomEvent(this.viewport, "touchstart", event => this.startPinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "touchmove", event => this.movePinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "touchend", event => this.endPinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "touchcancel", event => this.endPinch(event), { passive: false });
+    this.registerDomEvent(this.viewport, "pointerdown", event => {
+      if (this.pinchActive && event.pointerType === "touch") { event.preventDefault(); event.stopPropagation(); }
+    }, { capture: true });
     this.registerDomEvent(this.viewport, "pointerdown", event => this.startPan(event));
     this.registerDomEvent(this.pageEl, "pointerdown", event => {
       if (event.button === 0 && this.tool === "select" && this.pageReady) this.selectionPointer = event.pointerId;
@@ -227,6 +238,7 @@ export class PdfAnnotatorView extends FileView {
       else { this.camera.x -= event.deltaX || (event.shiftKey ? event.deltaY : 0); this.camera.y -= event.shiftKey ? 0 : event.deltaY; this.applyCamera(); }
     }, { passive: false });
     this.registerDomEvent(this.pageEl, "contextmenu", event => {
+      if (this.pinchActive) { event.preventDefault(); return; }
       this.captureSelection(); if (!this.selection) return;
       event.preventDefault(); const menu = new Menu();
       for (const category of this.categories.active()) menu.addItem(item => item.setTitle(category.label).setIcon(category.icon).onClick(() => this.editSelection(category.id)));
@@ -294,6 +306,7 @@ export class PdfAnnotatorView extends FileView {
     this.workerUrl = null;
   }
   private releaseDocument() {
+    this.resetPinch();
     this.commentPreview.hide();
     this.selectionPointer = null; this.commentPress = null; this.pageChangePending = false;
     this.generation++; this.pageGeneration++; this.resetPageRaster();
@@ -382,6 +395,7 @@ export class PdfAnnotatorView extends FileView {
   }
   private async showPage(pageNumber: number, edge: "top" | "bottom" = "top") {
     if (!this.pdf || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
+    this.resetPinch();
     this.resetPageRaster();
     this.currentPage = pageNumber; this.pageReady = false; this.viewport.scrollTop = 0; this.viewport.scrollLeft = 0;
     const token = ++this.pageGeneration, generation = this.generation;
@@ -587,7 +601,7 @@ export class PdfAnnotatorView extends FileView {
   }
   private openCommentAt(event: MouseEvent) {
     const press = this.commentPress; this.commentPress = null;
-    if (this.mode !== "reading" || !this.pageReady || event.button !== 0 || event.detail !== 1 || !press || press.dragged) return;
+    if (this.pinchActive || this.mode !== "reading" || !this.pageReady || event.button !== 0 || event.detail !== 1 || !press || press.dragged) return;
     this.captureSelection();
     if (this.selectionPointer !== null || this.selection) return;
     const box = this.pageEl.getBoundingClientRect(), zoom = this.camera.zoom;
@@ -598,7 +612,7 @@ export class PdfAnnotatorView extends FileView {
     this.commentPreview.show(matches, { left: box.left + quad.x * zoom, top: box.top + quad.y * zoom, bottom: box.top + (quad.y + quad.h) * zoom }, this.root);
   }
   private captureSelection() {
-    if (this.tool !== "select" || !this.pageReady) return;
+    if (this.pinchActive || this.tool !== "select" || !this.pageReady) return;
     const selection = this.win.getSelection();
     if (!selection?.rangeCount || selection.isCollapsed || !selection.toString().trim()) { this.clearSelection(); return; }
     const range = selection.getRangeAt(0);
@@ -672,6 +686,7 @@ export class PdfAnnotatorView extends FileView {
     if (tool === "hand") { this.clearSelection(); this.win.getSelection()?.removeAllRanges(); }
   }
   private startPan(event: PointerEvent) {
+    if (this.pinchActive) return;
     this.commentPreview.hide();
     if (this.mode === "reading") { if (!(event.target as HTMLElement).closest(".pdfaw-selection-toolbar")) this.clearSelection(); return; }
     const target = event.target as HTMLElement;
@@ -684,6 +699,7 @@ export class PdfAnnotatorView extends FileView {
     this.viewport.setPointerCapture(event.pointerId); this.viewport.addClass("is-panning");
   }
   private moveGesture(event: PointerEvent) {
+    if (this.pinchActive) return;
     const gesture = this.gesture; if (!gesture || gesture.pointer !== event.pointerId) return;
     const dx = event.clientX - gesture.start.x, dy = event.clientY - gesture.start.y;
     if (gesture.card) {
@@ -694,14 +710,79 @@ export class PdfAnnotatorView extends FileView {
   }
   private endGesture(event: PointerEvent) {
     const gesture = this.gesture; if (!gesture || gesture.pointer !== event.pointerId) return;
-    if (gesture.element.hasPointerCapture(event.pointerId)) gesture.element.releasePointerCapture(event.pointerId);
+    this.stopGesture();
+  }
+  private stopGesture() {
+    const gesture = this.gesture; if (!gesture) return;
+    if (gesture.element.hasPointerCapture(gesture.pointer)) gesture.element.releasePointerCapture(gesture.pointer);
     if (gesture.card) { this.cards.get(gesture.card.id)?.removeClass("is-dragging"); void this.save(); }
     this.viewport.removeClass("is-panning"); this.gesture = null;
   }
+  private pinchTouches(event: TouchEvent) {
+    return Array.from(event.touches).filter(touch => {
+      const target = touch.target as HTMLElement;
+      return this.viewport.contains(target) && !target.closest("button, input, textarea, select, .pdfaw-filters, .pdfaw-selection-toolbar");
+    });
+  }
+  private startPinch(event: TouchEvent) {
+    const touches = this.pinchTouches(event);
+    if (this.pinchActive && event.cancelable) event.preventDefault();
+    if (this.pinch || touches.length < 2 || !this.pageReady || !event.cancelable) return;
+    const [a, b] = touches;
+    const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    if (distance < 1) return;
+    event.preventDefault(); this.stopGesture(); this.commentPreview.hide();
+    this.selectionPointer = null; this.commentPress = null;
+    this.clearSelection(); this.win.getSelection()?.removeAllRanges();
+    const page = this.pageEl.getBoundingClientRect(), zoom = this.camera.zoom;
+    this.pinch = { ids: [a.identifier, b.identifier], distance, zoom, anchor: {
+      x: ((a.clientX + b.clientX) / 2 - page.left) / zoom,
+      y: ((a.clientY + b.clientY) / 2 - page.top) / zoom,
+    } };
+    this.pinchActive = true;
+  }
+  private movePinch(event: TouchEvent) {
+    if (!this.pinchActive) return;
+    if (event.cancelable) event.preventDefault();
+    const pinch = this.pinch; if (!pinch) return;
+    const touches = Array.from(event.touches);
+    const a = touches.find(touch => touch.identifier === pinch.ids[0]);
+    const b = touches.find(touch => touch.identifier === pinch.ids[1]);
+    if (!a || !b) return;
+    const center = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+    const zoom = Math.max(0.1, Math.min(3, pinch.zoom * Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) / pinch.distance));
+    this.camera.zoom = zoom;
+    if (this.mode === "reading") {
+      this.applyCamera();
+      // Measure after scaling: centered pages change their left margin as they
+      // grow. Native scroll bounds may clamp the anchor at the page edges.
+      const page = this.pageEl.getBoundingClientRect();
+      this.viewport.scrollLeft += page.left + pinch.anchor.x * zoom - center.x;
+      this.viewport.scrollTop += page.top + pinch.anchor.y * zoom - center.y;
+    } else {
+      const viewport = this.viewport.getBoundingClientRect();
+      this.camera.x = center.x - viewport.left - pinch.anchor.x * zoom;
+      this.camera.y = center.y - viewport.top - pinch.anchor.y * zoom;
+      this.applyCamera();
+    }
+  }
+  private endPinch(event: TouchEvent) {
+    if (!this.pinchActive) return;
+    if (event.cancelable) event.preventDefault();
+    const touches = this.pinchTouches(event);
+    if (!touches.length) { this.resetPinch(); return; }
+    if (this.pinch?.ids.every(id => touches.some(touch => touch.identifier === id))) return;
+    // Keep the remaining finger from resuming a stale pan or selection. If a
+    // third finger replaces one of the pair, establish a fresh anchor.
+    this.pinch = null;
+    if (event.type !== "touchcancel") this.startPinch(event);
+  }
+  private resetPinch() { this.pinch = null; this.pinchActive = false; }
   private cardBounds(): Bounds[] { return this.visibleAnnotations().map(annotation => ({ ...this.position(annotation), width: CARD_WIDTH, height: this.cards.get(annotation.id)?.offsetHeight || 220 })); }
   private bounds() { return sceneBounds(this.pageWidth, this.pageHeight, this.cardBounds()); }
   private setMode(mode: "canvas" | "reading") {
     if (mode === this.mode) return;
+    this.resetPinch();
     this.commentPress = null;
     this.clearSelection(); this.win.getSelection()?.removeAllRanges();
     if (mode === "reading") this.canvasCamera = { ...this.camera };

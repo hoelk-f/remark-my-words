@@ -1,5 +1,6 @@
 import { testCategories } from "./category-browser.mjs";
 import { testRendering } from "./rendering-browser.mjs";
+import { testTouch } from "./touch-browser.mjs";
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
@@ -49,7 +50,7 @@ function fixturePdf() {
   pdf += `xref\n0 9\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 9 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
   return Buffer.from(pdf);
 }
-const html = `<!DOCTYPE html><html><meta charset="UTF-8"><style>html,body,#app{height:100%;margin:0}body{--font-interface:Arial,sans-serif;font-family:Arial,sans-serif}button,input,textarea,select{font:inherit}button{border:1px solid #424855;border-radius:5px} .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;background:#242832;color:white;padding:25px;border:1px solid #777;border-radius:12px;overflow:auto}.setting-item{display:flex;justify-content:space-between;padding:12px 0}.setting-item-control{order:1;display:flex;gap:8px}</style><link rel="stylesheet" href="/styles.css"><div id="app"></div><script type="module" src="/bundle.js"></script></html>`;
+const html = `<!DOCTYPE html><html><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body,#app{height:100%;margin:0}body{--font-interface:Arial,sans-serif;font-family:Arial,sans-serif}button,input,textarea,select{font:inherit}button{border:1px solid #424855;border-radius:5px} .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;background:#242832;color:white;padding:25px;border:1px solid #777;border-radius:12px;overflow:auto}.setting-item{display:flex;justify-content:space-between;padding:12px 0}.setting-item-control{order:1;display:flex;gap:8px}</style><link rel="stylesheet" href="/styles.css"><div id="app"></div><script type="module" src="/bundle.js"></script></html>`;
 const routes = new Map([
   ['/', ['text/html', html]], ['/bundle.js', ['text/javascript', bundle.outputFiles[0].contents]],
   ['/styles.css', ['text/css', await readFile(path.join(root, 'styles.css'))]],
@@ -358,6 +359,7 @@ try {
   }
   await testCategories({evaluate, until, cdp});
   await testRendering({evaluate, until, cdp});
+  await testTouch({evaluate, until, cdp});
   await evaluate(`view.deleteAnnotation(view.sidecar.annotations[0]);view.onLoadFile(new TFile('Forschungspapier.pdf'))`);
   const annotationsAfterReload = await evaluate('view.sidecar.annotations.length');
   await evaluate(`document.querySelector('.pdfaw-delete-modal .mod-warning').click();view.saveQueue`);
