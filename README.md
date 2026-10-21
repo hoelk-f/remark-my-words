@@ -3,22 +3,22 @@
 **Read a PDF. Mark a passage. Give your thoughts room.**
 
 Remark My Words is an Obsidian community plugin for reading and annotating PDFs.
-Write categorized comments beside passages, then switch to a canvas where your
-notes become movable cards connected to the original text.
+Write categorized comments beside passages, then open a native Obsidian canvas
+with every PDF page and movable comment cards.
 Use it for manuals, reports, books, articles, and other PDF documents in your vault.
 
 ![PDF page surrounded by categorized comment cards and colored connectors](docs/images/canvas-preview.png)
 
-*Canvas preview with a sample document in the browser test harness.*
+*Page layout preview with a sample document in the browser test harness.*
 
 ## Read closely, think spatially
 
 | Reading mode | Canvas mode |
 | --- | --- |
-| Focus on one PDF page with normal scrolling. | Arrange comment cards around the PDF. |
-| Select a passage and add a comment from the floating toolbar. | Follow colored connectors back to the source passage. |
-| Click a highlight to read, edit, or delete its comment. | Pan, zoom, filter categories, and arrange cards. |
-| Keep your reading position when saving a comment. | Keep your card positions when switching modes. |
+| Focus on one PDF page with normal scrolling. | Put all pages on one native Obsidian canvas. |
+| Select a passage and add a comment from the floating toolbar. | Move pages and comment cards, create groups, and use native menus. |
+| Click a highlight or open comments in the right sidebar. | Jump to a moved page from the left sidebar. |
+| Keep your reading position when saving a comment. | Rearrange pages vertically with comments on both sides. |
 
 Use the default categories or create your own categories for each annotation.
 Each comment can have a title, description, and tags.
@@ -39,10 +39,20 @@ The PDF renderer is bundled with the plugin, so no additional download is needed
 
 1. After installing, enable **Remark My Words** under **Settings > Community plugins**.
 2. Run **Remark My Words: Open PDF** from the command palette or click the pen-and-file ribbon icon. The active PDF opens immediately; otherwise choose a PDF from the vault. You can also right-click a PDF and choose **Open in Remark My Words**.
-3. Use the **book** icon for Reading or the **dashboard** icon for Canvas. Tooltips identify each control.
+3. Use **Reading mode** to annotate, or **Canvas mode** to open the whole document in Obsidian Canvas. Enable Obsidian's **Canvas** core plugin. **Page layout** keeps the original single-page annotation layout available.
 4. Select text, click a category in the floating toolbar, and fill in **Add comment**. Right-clicking selected text also offers categories.
-5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. Click outside the preview, press **Escape**, or use its close button to dismiss it. The **Read page comments** button also works with a keyboard or touch input.
-6. In Canvas, drag a card by its header. Double-click it to edit; its **…** menu provides category changes and deletion.
+5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. **Read page comments** opens a dockable right sidebar that follows page navigation and supports editing and deletion.
+6. In Canvas, use Obsidian's normal selection, dragging, resizing, grouping, right-click menus, and undo/redo. The **PDF pages** sidebar on the left jumps to each page's current position. **Rearrange pages and comments** places pages underneath each other, leaving room for comments on both sides and preserving group membership.
+
+The canvas is saved next to the PDF as `<document>.pdf.remark.canvas`. It contains
+native PDF embeds that open at their assigned page, and editable text cards linked
+to those page cards. The canvas uses Obsidian's own appearance and controls.
+Use **Edit source comment** on a card or the right sidebar to change the original
+PDF annotation. **Refresh comments from PDF** updates generated cards and adds
+new annotations. Direct edits to canvas text remain independent and are preserved;
+refreshing does not overwrite them or restore cards you removed. Reopening Canvas
+from the reader also refreshes comments while keeping your layout, groups, and
+additional cards. Use **Rearrange** when new comments need more space.
 
 Navigate pages with thumbnails, arrows, or the page number. In Reading, mouse-wheel
 scrolling past the bottom opens the next page at its top, or past the top opens the
@@ -54,8 +64,9 @@ Deleting a comment asks for confirmation.
 Click **Customize** in the PDF toolbar. The same manager is available from
 **Settings > Remark My Words** and the command palette. Choose the plugin
 interface colors for the background, panels, borders, text, secondary text, and
-accent states. You can also add a category, change its name, color, or icon, or
-delete it; then choose **Save**. **Cancel** leaves the previous
+accent states. You can also add a category, change its name, color, or icon,
+move it up or down, or delete it; then choose **Save**. Category order applies to
+selection tools, filters, and comment menus. **Cancel** leaves the previous
 settings unchanged.
 
 The initial categories remain **Claim, Evidence, Method, Concept, Limitation,
@@ -85,9 +96,10 @@ sync these files; the plugin does not provide its own synchronization.
 
 ## Keyboard shortcuts
 
-On touchscreens, spread or pinch two fingers over the PDF or canvas to zoom in
-or out around their midpoint. In Reading mode, one finger still scrolls the
-page; in Canvas mode, use the hand tool to pan with one finger.
+The shortcuts below apply to Reading and Page layout. Native Canvas uses
+Obsidian's own shortcuts and touch controls. On touchscreens, spread or pinch two
+fingers over the reader to zoom around their midpoint. In Reading, one finger
+scrolls the page; in Page layout, use the hand tool to pan with one finger.
 
 | Shortcut | Action |
 | --- | --- |
@@ -103,7 +115,8 @@ page; in Canvas mode, use the hand tool to pan with one finger.
 
 ## Current limits
 
-- One PDF page is displayed at a time in both modes.
+- Reading and Page layout display one PDF page at a time; native Canvas contains all pages.
+- Native canvas connections attach to page cards. Passage-level highlights and annotation editing remain in the reader and Page layout.
 - Scanned documents need an existing text layer; OCR is not included.
 - Annotations live in the JSON file, not as native annotations inside the PDF.
 - Concurrent edits to the same PDF from multiple views or devices are not merged.

@@ -11,6 +11,9 @@ import { PdfPicker, RemarkSettingsTab } from "./plugin-access";
 import workerSource from "embedded-pdf-worker";
 import { applyThemeColors } from "./theme";
 import { DeleteCommentModal } from "./modal";
+import { COMMENTS_VIEW, PAGES_VIEW, PdfSidebar, Sidebars } from "./sidebar";
+import { NativeCanvas } from "./native-canvas";
+import type { PageSize } from "./canvas-model";
 
 const VIEW_TYPE = "pdfaw-view";
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -35,7 +38,7 @@ export class PdfAnnotatorView extends FileView {
   private pageInput!: HTMLInputElement;
   private pageTotal!: HTMLSpanElement;
   private zoomLabel!: HTMLButtonElement;
-  private mode: "canvas" | "reading" = "canvas";
+  private mode: "canvas" | "reading" = "reading";
   private canvasCamera: typeof this.camera | null = null;
   private modeButtons = new Map<string, HTMLButtonElement>();
   private selectionBar!: HTMLDivElement;
@@ -83,8 +86,9 @@ export class PdfAnnotatorView extends FileView {
   private pinchActive = false;
   private pageReady = false;
   private geometryFrame = 0;
+  private fileReady: Promise<void> = Promise.resolve();
 
-  constructor(leaf: WorkspaceLeaf, private categories: CategoryStore) { super(leaf); }
+  constructor(leaf: WorkspaceLeaf, private categories: CategoryStore, private sidebars: Sidebars, private nativeCanvas: NativeCanvas) { super(leaf); }
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return this.file?.name ?? "Remark My Words"; }
   getIcon() { return "file-pen-line"; }
@@ -99,13 +103,14 @@ export class PdfAnnotatorView extends FileView {
 
   async onOpen() {
     this.contentEl.empty(); this.contentEl.addClass("pdfaw-content");
-    this.root = this.contentEl.createDiv({ cls: "pdfaw-root", attr: { tabindex: "0" } });
+    this.root = this.contentEl.createDiv({ cls: "pdfaw-root pdfaw-reading", attr: { tabindex: "0" } });
     this.applyTheme();
     const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
 
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
+    this.button(modes, "layout-dashboard", "Canvas mode", () => { void this.openNativeCanvas(); });
     for (const mode of ["canvas", "reading"] as const) {
-      const button = this.button(modes, mode === "canvas" ? "layout-dashboard" : "book-open", mode === "canvas" ? "Canvas mode" : "Reading mode", () => this.setMode(mode));
+      const button = this.button(modes, mode === "canvas" ? "layout-panel-left" : "book-open", mode === "canvas" ? "Page layout" : "Reading mode", () => this.setMode(mode));
       button.setAttribute("aria-pressed", String(this.mode === mode)); this.modeButtons.set(mode, button);
     }
     const tools = toolbar.createDiv({ cls: "pdfaw-tool-group" });
@@ -128,8 +133,8 @@ export class PdfAnnotatorView extends FileView {
     this.pageTotal = navigation.createSpan({ cls: "pdfaw-page-total", text: "0" });
     this.button(navigation, "chevron-right", "Next page", () => void this.showPage(this.currentPage + 1));
     const right = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-toolbar-end" });
-    const readComments = this.button(right, "messages-square", "Read page comments", () => {
-      this.commentPreview.show(this.pageAnnotations(), readComments.getBoundingClientRect(), readComments);
+    this.button(right, "messages-square", "Read page comments", () => {
+      this.updateSidebar(); void this.sidebars.show(COMMENTS_VIEW);
     }, "pdfaw-read-comments");
     this.button(right, "layout-dashboard", "Rearrange cards on this page", () => this.rearrangeCards());
     this.button(right, "settings", "Customize", () => new CategoryModal(this.app, this.categories).open());
@@ -264,7 +269,39 @@ export class PdfAnnotatorView extends FileView {
     applyThemeColors(this.root, this.categories.themeColors());
   }
 
+  updateSidebar() {
+    if (!this.file || !this.pdf || !this.sidecar) return;
+    this.sidebars.update({ owner: this, name: this.file.name, page: this.currentPage, pages: this.pdf.numPages, annotations: this.sidecar.annotations,
+      jump: page => { void this.showPage(page); }, edit: annotation => this.editAnnotation(annotation), remove: annotation => this.deleteAnnotation(annotation) });
+  }
+  async openAt(page = 1, annotationId?: string, remove = false) {
+    await this.fileReady;
+    if (page !== this.currentPage) await this.showPage(page);
+    this.setMode("reading"); this.updateSidebar();
+    const annotation = this.sidecar?.annotations.find(item => item.id === annotationId);
+    if (annotation) { if (remove) this.deleteAnnotation(annotation); else this.editAnnotation(annotation); }
+  }
+  async openNativeCanvas() {
+    await this.fileReady;
+    if (!this.pdf || !this.file || !this.sidecar) return;
+    const pdf = this.pdf, file = this.file, data = this.sidecar;
+    try {
+      await this.flushNotes();
+      const pages: PageSize[] = [];
+      for (let n = 1; n <= pdf.numPages; n++) {
+        const page = await pdf.getPage(n);
+        if (pdf !== this.pdf) return;
+        const viewport = page.getViewport({ scale: PDF_SCALE }); pages.push({ width: viewport.width, height: viewport.height });
+      }
+      await this.nativeCanvas.open(file, data, pages);
+    } catch (error) { new Notice("Could not open the PDF canvas."); console.error("Remark My Words: canvas", error); }
+  }
+
   async onLoadFile(file: TFile) {
+    this.fileReady = this.loadPdf(file);
+    await this.fileReady;
+  }
+  private async loadPdf(file: TFile) {
     if (!this.root) await this.onOpen();
     await this.flushNotes(); this.releaseDocument();
     const generation = this.generation;
@@ -306,6 +343,7 @@ export class PdfAnnotatorView extends FileView {
     this.workerUrl = null;
   }
   private releaseDocument() {
+    if (this.sidebars.context?.owner === this) this.sidebars.update(null);
     this.resetPinch();
     this.commentPreview.hide();
     this.selectionPointer = null; this.commentPress = null; this.pageChangePending = false;
@@ -546,6 +584,7 @@ export class PdfAnnotatorView extends FileView {
     }
     this.status.setText(`${this.file?.name ?? "PDF"}  /  Page ${this.currentPage}  ·  ${this.visibleAnnotations().length} of ${this.sidecar?.annotations.length ?? 0} annotations`);
     this.queueGeometry();
+    if (this.sidebars.context?.owner === this || this.app.workspace.getActiveViewOfType(PdfAnnotatorView) === this) this.updateSidebar();
   }
   private rearrangeCards() {
     let leftY = 28, rightY = 28;
@@ -860,10 +899,33 @@ export class PdfAnnotatorView extends FileView {
 
 export default class RemarkMyWordsPlugin extends Plugin {
   private categories!: CategoryStore;
+  private sidebars!: Sidebars;
+  private nativeCanvas!: NativeCanvas;
   async onload() {
     const stored: unknown = await this.loadData();
     this.categories = new CategoryStore(readCategorySettings(stored), (categories, theme) => this.saveData({ categories, theme }), readThemeColors(stored));
-    this.registerView(VIEW_TYPE, leaf => new PdfAnnotatorView(leaf, this.categories));
+    this.sidebars = new Sidebars(this.app);
+    this.nativeCanvas = new NativeCanvas(this.app, this.categories, this.sidebars, (file, page, annotation, remove) => this.openReader(file, page, annotation?.id, remove));
+    this.register(() => this.nativeCanvas.destroy());
+    this.registerView(VIEW_TYPE, leaf => new PdfAnnotatorView(leaf, this.categories, this.sidebars, this.nativeCanvas));
+    for (const type of [COMMENTS_VIEW, PAGES_VIEW] as const) this.registerView(type, leaf => new PdfSidebar(leaf, type, this.categories, () => this.sidebars.context));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", leaf => {
+      if (leaf?.view instanceof PdfAnnotatorView) { this.nativeCanvas.cancelActivation(); leaf.view.updateSidebar(); return; }
+      if (leaf && [COMMENTS_VIEW, PAGES_VIEW].includes(leaf.view.getViewType())) return;
+      void this.nativeCanvas.activate(leaf).then(active => { if (!active && this.app.workspace.getMostRecentLeaf() === leaf) this.sidebars.update(null); });
+    }));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.nativeCanvas.pruneActions()));
+    this.app.workspace.onLayoutReady(() => {
+      const leaf = this.app.workspace.getMostRecentLeaf();
+      if (leaf?.view instanceof PdfAnnotatorView) leaf.view.updateSidebar(); else void this.nativeCanvas.activate(leaf);
+    });
+    this.registerObsidianProtocolHandler("remark-my-words", params => {
+      if (params.vault && params.vault !== this.app.vault.getName()) return;
+      const file = this.app.vault.getAbstractFileByPath(params.file ?? "");
+      if (file instanceof TFile && file.extension.toLowerCase() === "pdf") void this.openReader(file, Math.max(1, Number(params.page) || 1), params.comment);
+    });
+    this.addCommand({ id: "open-pdf-canvas", name: "Open PDF canvas", checkCallback: checking => { const view = this.app.workspace.getActiveViewOfType(PdfAnnotatorView); if (!view) return false; if (!checking) void view.openNativeCanvas(); return true; } });
+    this.addCommand({ id: "rearrange-pdf-canvas", name: "Rearrange PDF canvas", checkCallback: checking => { const leaf = this.app.workspace.getMostRecentLeaf(); if (!leaf || !this.nativeCanvas.owns(leaf)) return false; if (!checking) void this.nativeCanvas.rearrange(leaf); return true; } });
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
     this.addCommand({ id: "manage-categories", name: "Customize", callback: () => new CategoryModal(this.app, this.categories).open() });
     this.addRibbonIcon("file-pen-line", "Remark My Words", () => this.openPdf());
@@ -873,6 +935,14 @@ export default class RemarkMyWordsPlugin extends Plugin {
         void this.app.workspace.getLeaf(false).setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
       }));
     }));
+  }
+  private async openReader(file: TFile, page = 1, annotationId?: string, remove = false) {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE).find(leaf => leaf.view instanceof PdfAnnotatorView && leaf.view.file?.path === file.path);
+    const leaf = existing ?? this.app.workspace.getLeaf("tab");
+    if (!existing) await leaf.setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
+    await leaf.loadIfDeferred(); await this.app.workspace.revealLeaf(leaf);
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    if (leaf.view instanceof PdfAnnotatorView) await leaf.view.openAt(page, annotationId, remove);
   }
   private openPdf() {
     const open = (file: TFile) => { void this.app.workspace.getLeaf(false).setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true }); };

@@ -22,11 +22,17 @@ export class FileView {
   register(fn) { this.cleanups.push(fn); }
   registerDomEvent(el, name, fn, options) { el.addEventListener(name, fn, options); this.register(() => el.removeEventListener(name, fn, options)); }
 }
+export class ItemView extends FileView {
+  constructor(leaf) { super(leaf); this.contentEl = leaf.contentEl ?? document.body.createDiv(); }
+}
+export class TextFileView extends FileView {}
 export class Plugin {
   constructor(app) { this.app = app; this.commands = []; this.ribbon = []; this.tabs = []; this.cleanups = []; }
   loadData() { return Promise.resolve(window.pluginData ?? null); }
   saveData(data) { if (window.failSettingsSave) return Promise.reject(new Error('Disk unavailable')); window.pluginData = structuredClone(data); return Promise.resolve(); }
-  registerView(type, factory) { this.viewFactory = factory; }
+  registerView(type, factory) { (this.factories ??= new Map()).set(type, factory); if (type === 'pdfaw-view') this.viewFactory = factory; }
+  register(fn) { this.cleanups.push(fn); }
+  registerObsidianProtocolHandler(action, handler) { (this.protocols ??= {})[action] = handler; }
   addCommand(command) { this.commands.push(command); }
   addRibbonIcon(icon, title, callback) { this.ribbon.push({icon,title,callback}); return document.createElement('button'); }
   addSettingTab(tab) { this.tabs.push(tab); }

@@ -1,13 +1,13 @@
 {
   "name": "remark-my-words",
-  "version": "0.2.15",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node -e \"process.env.NODE_ENV='production'; import('./esbuild.config.mjs')\"",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/model.test.mjs && node tests/categories.test.mjs",
+    "test": "node tests/model.test.mjs && node tests/categories.test.mjs && node tests/canvas.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "check:release": "node scripts/check-release.mjs",
     "package:release": "npm run build && npm run check:release && node scripts/package-release.mjs",

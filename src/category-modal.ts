@@ -31,7 +31,7 @@ export class CategoryModal extends Modal {
     }
     const categories = this.contentEl.createDiv({ cls: "pdfaw-category-settings" });
     categories.createEl("h3", { text: "Categories" });
-    categories.createEl("p", { cls: "pdfaw-category-help", text: "Create, edit, or remove the categories used for comments." });
+    categories.createEl("p", { cls: "pdfaw-category-help", text: "Create, edit, or reorder categories. The order is used in comment menus, filters, and the selection toolbar." });
     this.list = categories.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
     this.add = categories.createEl("button", { text: "Add category", attr: { type: "button" } });
@@ -70,6 +70,22 @@ export class CategoryModal extends Modal {
       const select = symbol.el.createEl("select", { attr: { id: symbol.id } });
       for (const icon of [...new Set([...Object.keys(CATEGORY_ICONS), item.icon])]) select.createEl("option", { text: CATEGORY_ICONS[icon] ?? "Custom icon", attr: { value: icon } });
       select.value = item.icon; select.onchange = () => { item.icon = select.value; setIcon(preview, item.icon); };
+      const order = row.createDiv({ cls: "pdfaw-category-order" });
+      for (const [direction, icon, offset] of [["up", "arrow-up", -1], ["down", "arrow-down", 1]] as const) {
+        const move = order.createEl("button", { attr: { type: "button", "aria-label": `Move ${item.label || "category"} ${direction}`, "data-move": direction } });
+        setIcon(move, icon);
+        const adjacent = active[active.indexOf(item) + offset];
+        move.disabled = !adjacent;
+        move.onclick = () => {
+          if (this.saving || !adjacent) return;
+          const from = this.draft.indexOf(item), to = this.draft.indexOf(adjacent);
+          [this.draft[from], this.draft[to]] = [this.draft[to], this.draft[from]];
+          this.render();
+          const moved = this.list.querySelector<HTMLElement>(`[data-category-id="${item.id}"]`);
+          const button = moved?.querySelector<HTMLButtonElement>(`[data-move="${direction}"]`);
+          if (button && !button.disabled) button.focus(); else moved?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
+        };
+      }
       const remove = row.createEl("button", { cls: "pdfaw-category-delete", attr: { type: "button", "aria-label": `Delete ${item.label || "category"}`, title: active.length === 1 ? "Keep at least one category" : "Delete category" } });
       setIcon(remove, "trash-2"); remove.disabled = active.length === 1;
       remove.onclick = () => {

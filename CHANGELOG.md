@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — 2026-10-21
+- Open a native Obsidian canvas with every PDF page as a movable file card and comments on both sides. Native grouping, context menus, resizing, and undo/redo are available.
+- Add a left PDF page sidebar that navigates to each page's current canvas position, including after manual moves.
+- Rearrange all pages vertically, calculating spacing from actual card dimensions and retaining native groups and additional cards.
+- Move Read page comments into a dockable right sidebar with page navigation, editing, and deletion.
+- Preserve native card edits, removals, groups, and layout when refreshing comments from the PDF. Source annotations remain editable through the sidebar and card links; direct native text edits stay independent.
+- Allow reordering categories and apply that order across menus, filters, and selection tools.
+- Fix repeating dropdown arrows in comment and category dialogs.
+- Keep the original single-page annotation canvas under Page layout; open PDFs in Reading by default.
+- Verify real native Canvas interactions in Obsidian 1.14.4 on Linux, plus browser, touch, layout, persistence, and invalid-data regression tests. Native mobile app verification remains pending.
+
 ## 0.2.15 — 2026-10-18
 - Enable mobile installation for testing in Obsidian on iPhone, iPad, and Android. Mobile app compatibility is still being verified; iOS/iPadOS 17.4 or later is required for the bundled PDF renderer.
 - Add two-finger pinch zoom in Canvas and Reading modes, keeping the PDF point under the finger midpoint and preserving one-finger scrolling and hand-tool panning.

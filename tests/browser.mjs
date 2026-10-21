@@ -91,6 +91,7 @@ try {
   assert.ok(await evaluate('document.querySelectorAll(".pdfaw-textlayer span").length') > 20);
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.pdfaw-modes button'), b => ({ text: b.textContent, label: b.getAttribute('aria-label'), icon: b.dataset.icon }))`), [
     { text: '', label: 'Canvas mode', icon: 'layout-dashboard' },
+    { text: '', label: 'Page layout', icon: 'layout-panel-left' },
     { text: '', label: 'Reading mode', icon: 'book-open' },
   ], 'Mode controls use accessible icons');
   // Obsidian disables selection on its UI; the PDF layer must explicitly opt in.
@@ -209,7 +210,7 @@ try {
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 0);
   await evaluate('view.showPage(1)');
   const canvasState = await evaluate('({ camera: {...view.camera}, positions: view.sidecar.annotations.map(a=>a.position) })');
-  await evaluate(`document.querySelector('.pdfaw-modes button:nth-child(2)').click()`);
+  await evaluate(`document.querySelector('button[aria-label="Reading mode"]').click()`);
   assert.equal(await evaluate('view.mode'), 'reading');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pdfaw-cards')).display`), 'none');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pdfaw-viewport')).overflowY`), 'auto');
@@ -292,7 +293,7 @@ try {
     const body = document.querySelector('.pdfaw-editor-body');
     body.value = 'Updated from Reading preview'; body.dispatchEvent(new Event('input'));
     [...document.querySelectorAll('.modal button')].find(button => button.textContent === 'Save').click();
-    document.querySelector('.pdfaw-read-comments').click();
+    view.commentPreview.show(view.pageAnnotations(), view.pageEl.getBoundingClientRect(), document.querySelector('.pdfaw-read-comments'));
     return view.saveQueue;
   })()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
@@ -304,25 +305,25 @@ try {
     document.querySelector('.pdfaw-preview-actions button[aria-label="Delete comment"]').click();
     document.querySelector('.pdfaw-delete-modal .mod-warning').click();
     window.previewClosedAfterDelete = document.querySelector('.pdfaw-comment-preview').hidden;
-    document.querySelector('.pdfaw-read-comments').click();
+    view.commentPreview.show(view.pageAnnotations(), view.pageEl.getBoundingClientRect(), document.querySelector('.pdfaw-read-comments'));
     return view.saveQueue;
   })()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   assert.equal(await evaluate('view.sidecar.annotations.length'), annotationsBeforePreviewDelete - 1);
   assert.equal(await evaluate('window.previewClosedAfterDelete'), true, 'Deleting closes the original preview');
   assert.equal(await evaluate('document.querySelector(".pdfaw-comment-preview").hidden'), false, 'Preview stays open after deleting and hidden-card resize notifications');
-  assert.equal(await evaluate('document.querySelectorAll(".pdfaw-preview-item").length'), 5, 'Keyboard/touch button exposes all page comments');
+  assert.equal(await evaluate('document.querySelectorAll(".pdfaw-preview-item").length'), 5, 'Preview can still render multiple matching comments');
   assert.equal(await evaluate('document.activeElement.className'), 'pdfaw-comment-preview');
   await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
   await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
   assert.equal(await evaluate('document.querySelector(".pdfaw-comment-preview").hidden'), true);
   assert.equal(await evaluate('document.activeElement.classList.contains("pdfaw-read-comments")'), true, 'Escape restores focus to the page-comments button');
-  await evaluate('document.querySelector(".pdfaw-read-comments").click()');
+  await evaluate(`view.commentPreview.show(view.pageAnnotations(), view.pageEl.getBoundingClientRect(), document.querySelector('.pdfaw-read-comments'))`);
   await evaluate(`document.querySelector('.pdfaw-comment-preview button[aria-label="Close preview"]').click()`);
   assert.equal(await evaluate('document.querySelector(".pdfaw-comment-preview").hidden'), true);
   assert.equal(await evaluate('document.activeElement.classList.contains("pdfaw-read-comments")'), true, 'Close restores focus to the page-comments button');
   await evaluate(`(() => {
-    document.querySelector('.pdfaw-read-comments').click();
+    view.commentPreview.show(view.pageAnnotations(), view.pageEl.getBoundingClientRect(), document.querySelector('.pdfaw-read-comments'));
     document.querySelector('button[aria-label="Toggle page sidebar"]').click();
   })()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
@@ -344,7 +345,7 @@ try {
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).comment'), 'Reading mode comment');
   assert.equal(await evaluate('view.viewport.scrollTop'), scrollBefore, 'Adding a comment preserves reading position');
   assert.equal(await evaluate('view.mode'), 'reading');
-  await evaluate(`document.querySelector('.pdfaw-modes button').click()`);
+  await evaluate(`document.querySelector('button[aria-label="Page layout"]').click()`);
   assert.deepEqual(await evaluate('view.camera'), canvasState.camera, 'Canvas camera survives reading mode');
   assert.deepEqual(await evaluate('view.sidecar.annotations.slice(0,-1).map(a=>a.position)'), canvasState.positions.slice(1));
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 6);
@@ -357,9 +358,21 @@ try {
     await evaluate(`(() => { const span=document.querySelector('.pdfaw-textlayer span');const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);view.captureSelection(); })()`);
     assert.ok(await evaluate(`(() => { const r=view.selectionBar.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth; })()`), `Selection toolbar stays on screen at ${width}px`);
   }
+  await evaluate(`document.querySelector('.pdfaw-read-comments').click()`);
+  await until('document.querySelectorAll(".pdfaw-sidebar-comment").length === view.pageAnnotations().length');
+  assert.equal(await evaluate('plugin.sidebars.context.page'),1,'Comments open in the dockable workspace sidebar');
+  await evaluate('view.showPage(2)');
+  assert.equal(await evaluate('plugin.sidebars.context.page'),2,'Sidebar follows page navigation');
+  assert.equal(await evaluate('document.querySelectorAll(".pdfaw-sidebar-comment").length'),0);
+  await evaluate('view.showPage(1)');
+  await evaluate('document.querySelector(".test-sidebar").style.display="none"');
   await testCategories({evaluate, until, cdp});
   await testRendering({evaluate, until, cdp});
   await testTouch({evaluate, until, cdp});
+  await evaluate(`(async()=>{const loading=view.onLoadFile(new TFile('Forschungspapier.pdf'));await view.openAt(2);await loading;})()`);
+  assert.equal(await evaluate('view.currentPage'),2,'A sidebar/source link waits for PDF loading before navigating');
+  assert.equal(await evaluate('view.pageReady'),true);
+  await evaluate('view.showPage(1)');
   await evaluate(`view.deleteAnnotation(view.sidecar.annotations[0]);view.onLoadFile(new TFile('Forschungspapier.pdf'))`);
   const annotationsAfterReload = await evaluate('view.sidecar.annotations.length');
   await evaluate(`document.querySelector('.pdfaw-delete-modal .mod-warning').click();view.saveQueue`);

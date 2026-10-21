@@ -24,6 +24,9 @@ installable files into `dist/remark-my-words/`. No npm publication is needed.
 - `src/selection.ts`: selection geometry from PDF text nodes.
 - `src/editor.ts`: comment form.
 - `src/comment-preview.ts`: Reading-mode previews.
+- `src/sidebar.ts`: dockable page navigation and page comments.
+- `src/canvas-model.ts`: lossless JSON Canvas validation, merging, and multipage layout.
+- `src/native-canvas.ts`: native Canvas file lifecycle, toolbar actions, and viewport navigation.
 - `styles.css`: plugin-scoped styles.
 - `scripts/pdf-worker-plugin.mjs`: embeds the matching PDF.js worker as text at build time.
 - `tests/`: model and browser integration tests.
@@ -55,8 +58,36 @@ and narrow windows. It deliberately does not serve a separate worker file.
 Screenshots are written to `.test-artifacts/`. The mock uses placeholder icons;
 Obsidian provides the real icons in the host application.
 
-CI builds on Windows and Linux and runs browser interactions on Windows. It has
-not run on GitHub until these workflow files have been pushed.
+CI builds on Windows and Linux and runs browser interactions on Windows.
+
+## Native Canvas
+
+The reader creates `<pdf-path>.remark.canvas` using JSON Canvas 1.0. Every page is
+a native file node with `subpath: #page=N`; comments are native text nodes with
+connections to their page. The top-level `remarkMyWords` metadata identifies the
+source PDF, page sizes and previously imported annotations. Node metadata maps
+pages/comments and keeps the last generated text. Obsidian retains these extra
+fields on native save. Unknown properties, user-created nodes and edges survive
+updates. Invalid or unrelated canvas files are rejected before writing.
+
+Refresh updates only untouched generated text. Native text edits remain independent
+of source annotations, and removed native cards are not recreated. Source comment
+editing uses the sidebar or an `obsidian://remark-my-words` link that identifies
+the vault, PDF, page and annotation. Rearrange uses current node dimensions and
+expands containing groups to retain their membership. Explicit native edits are
+saved through `TextFileView.setViewData` and `save`; recording the current data
+before an update makes native Undo restore even a just-completed drag.
+
+Most integration uses public workspace, file view and vault APIs. Page centering
+uses the native Canvas `zoomToBbox` method behind a runtime guard because no public
+Canvas viewport API exists. The canvas remains usable if that method is unavailable.
+
+For host integration checks, use an isolated vault and enable the Canvas core
+plugin. Verify a PDF with mixed page sizes and long comments, native page dragging,
+the page sidebar after moving cards, background and multi-selection context menus,
+group creation, rearrange, undo/redo, reopening, source comment refresh and the
+category dropdown. These flows were exercised in Obsidian 1.14.4 on Linux for
+0.3.0. Browser mocks do not substitute for this host test or certify iOS/Android.
 
 ## Data compatibility
 
