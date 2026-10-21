@@ -26,3 +26,20 @@ export class DeleteCommentModal extends Modal {
 
   onClose() { this.contentEl.empty(); }
 }
+
+export class GroupNameModal extends Modal {
+  constructor(app: App, private name: string, private theme: ThemeColors, private submit: (name: string) => void) { super(app); }
+  onOpen() {
+    applyModalTheme(this, this.theme); this.setTitle(this.name ? "Rename group" : "Create group");
+    const id = `pdfaw-group-${crypto.randomUUID()}`;
+    this.contentEl.createEl("label", { text: "Group name", attr: { for: id } });
+    const input = this.contentEl.createEl("input", { cls: "pdfaw-group-name", attr: { id, type: "text", maxlength: "100", placeholder: "Group name" } }); input.value = this.name;
+    const actions = this.contentEl.createDiv({ cls: "pdfaw-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).onclick = () => this.close();
+    const save = () => { const name = input.value.trim(); if (!name) { input.focus(); return; } this.submit(name); this.close(); };
+    actions.createEl("button", { text: "Save", cls: "mod-cta" }).onclick = save;
+    input.onkeydown = event => { if (event.key === "Enter") { event.preventDefault(); save(); } };
+    input.focus(); input.select();
+  }
+  onClose() { this.contentEl.empty(); }
+}

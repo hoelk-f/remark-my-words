@@ -245,7 +245,7 @@ __export(main_exports, {
   default: () => RemarkMyWordsPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian8 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // node_modules/pdfjs-dist/build/pdf.mjs
 var import_meta = {};
@@ -1711,10 +1711,10 @@ var _ImageManager = class _ImageManager {
     const {
       lastModified,
       name,
-      size: size2,
+      size,
       type
     } = file;
-    return __privateMethod(this, _ImageManager_instances, get_fn).call(this, `${lastModified}_${name}_${size2}_${type}`, file);
+    return __privateMethod(this, _ImageManager_instances, get_fn).call(this, `${lastModified}_${name}_${size}_${type}`, file);
   }
   async getFromUrl(url) {
     return __privateMethod(this, _ImageManager_instances, get_fn).call(this, url, url);
@@ -5095,7 +5095,7 @@ resizerPointermove_fn = function(name, event) {
       getOpposite = (w, h) => [w, h / 2];
       break;
   }
-  const point2 = getPoint(savedWidth, savedHeight);
+  const point3 = getPoint(savedWidth, savedHeight);
   const oppositePoint = getOpposite(savedWidth, savedHeight);
   let transfOppositePoint = transf(...oppositePoint);
   const oppositeX = _AnnotationEditor._round(savedX + transfOppositePoint[0]);
@@ -5121,11 +5121,11 @@ resizerPointermove_fn = function(name, event) {
   [deltaX, deltaY] = invTransf(deltaX / parentWidth, deltaY / parentHeight);
   if (isDiagonal) {
     const oldDiag = Math.hypot(savedWidth, savedHeight);
-    ratioX = ratioY = Math.max(Math.min(Math.hypot(oppositePoint[0] - point2[0] - deltaX, oppositePoint[1] - point2[1] - deltaY) / oldDiag, 1 / savedWidth, 1 / savedHeight), minWidth / savedWidth, minHeight / savedHeight);
+    ratioX = ratioY = Math.max(Math.min(Math.hypot(oppositePoint[0] - point3[0] - deltaX, oppositePoint[1] - point3[1] - deltaY) / oldDiag, 1 / savedWidth, 1 / savedHeight), minWidth / savedWidth, minHeight / savedHeight);
   } else if (isHorizontal) {
-    ratioX = Math.max(minWidth, Math.min(1, Math.abs(oppositePoint[0] - point2[0] - deltaX))) / savedWidth;
+    ratioX = Math.max(minWidth, Math.min(1, Math.abs(oppositePoint[0] - point3[0] - deltaX))) / savedWidth;
   } else {
-    ratioY = Math.max(minHeight, Math.min(1, Math.abs(oppositePoint[1] - point2[1] - deltaY))) / savedHeight;
+    ratioY = Math.max(minHeight, Math.min(1, Math.abs(oppositePoint[1] - point3[1] - deltaY))) / savedHeight;
   }
   const newWidth = _AnnotationEditor._round(savedWidth * ratioX);
   const newHeight = _AnnotationEditor._round(savedHeight * ratioY);
@@ -6111,12 +6111,12 @@ createStreamSink_fn = function(data) {
   const streamId = data.streamId, sourceName = this.sourceName, targetName = data.sourceName, comObj = this.comObj;
   const self = this, action = this.actionHandler[data.action];
   const streamSink = {
-    enqueue(chunk, size2 = 1, transfers) {
+    enqueue(chunk, size = 1, transfers) {
       if (this.isCancelled) {
         return;
       }
       const lastDesiredSize = this.desiredSize;
-      this.desiredSize -= size2;
+      this.desiredSize -= size;
       if (lastDesiredSize > 0 && this.desiredSize <= 0) {
         this.sinkCapability = Promise.withResolvers();
         this.ready = this.sinkCapability.promise;
@@ -7195,15 +7195,15 @@ var _TilingPattern = class _TilingPattern {
   }
   getSizeAndScale(step, realOutputSize, scale) {
     const maxSize = Math.max(_TilingPattern.MAX_PATTERN_SIZE, realOutputSize);
-    let size2 = Math.ceil(step * scale);
-    if (size2 >= maxSize) {
-      size2 = maxSize;
+    let size = Math.ceil(step * scale);
+    if (size >= maxSize) {
+      size = maxSize;
     } else {
-      scale = size2 / step;
+      scale = size / step;
     }
     return {
       scale,
-      size: size2
+      size
     };
   }
   clipBbox(graphics, x0, y0, x1, y1) {
@@ -8530,7 +8530,7 @@ var _CanvasGraphics = class _CanvasGraphics {
   setLeading(leading) {
     this.current.leading = -leading;
   }
-  setFont(fontRefName, size2) {
+  setFont(fontRefName, size) {
     const fontObj = this.commonObjs.get(fontRefName);
     const current = this.current;
     if (!fontObj) {
@@ -8540,14 +8540,14 @@ var _CanvasGraphics = class _CanvasGraphics {
     if (current.fontMatrix[0] === 0 || current.fontMatrix[3] === 0) {
       warn("Invalid font matrix for font " + fontRefName);
     }
-    if (size2 < 0) {
-      size2 = -size2;
+    if (size < 0) {
+      size = -size;
       current.fontDirection = -1;
     } else {
       current.fontDirection = 1;
     }
     this.current.font = fontObj;
-    this.current.fontSize = size2;
+    this.current.fontSize = size;
     if (fontObj.isType3Font) {
       return;
     }
@@ -8560,13 +8560,13 @@ var _CanvasGraphics = class _CanvasGraphics {
       bold = "bold";
     }
     const italic = fontObj.italic ? "italic" : "normal";
-    let browserFontSize = size2;
-    if (size2 < MIN_FONT_SIZE) {
+    let browserFontSize = size;
+    if (size < MIN_FONT_SIZE) {
       browserFontSize = MIN_FONT_SIZE;
-    } else if (size2 > MAX_FONT_SIZE) {
+    } else if (size > MAX_FONT_SIZE) {
       browserFontSize = MAX_FONT_SIZE;
     }
-    this.current.fontSizeScale = size2 / browserFontSize;
+    this.current.fontSizeScale = size / browserFontSize;
     this.ctx.font = `${italic} ${bold} ${browserFontSize}px ${typeface}`;
   }
   setTextRenderingMode(mode) {
@@ -11451,13 +11451,13 @@ getCtx_fn = function(lang = null) {
   }
   return ctx;
 };
-ensureCtxFont_fn = function(ctx, size2, family) {
+ensureCtxFont_fn = function(ctx, size, family) {
   const cached = __privateGet(this, _canvasCtxFonts).get(ctx);
-  if (size2 === cached.size && family === cached.family) {
+  if (size === cached.size && family === cached.family) {
     return;
   }
-  ctx.font = `${size2}px ${family}`;
-  cached.size = size2;
+  ctx.font = `${size}px ${family}`;
+  cached.size = size;
   cached.family = family;
 };
 ensureMinFontSizeComputed_fn = function() {
@@ -16964,10 +16964,10 @@ _editModeAC = new WeakMap();
 _fontSize = new WeakMap();
 _FreeTextEditor_instances = new WeakSet();
 updateFontSize_fn = function(fontSize) {
-  const setFontsize = (size2) => {
-    this.editorDiv.style.fontSize = `calc(${size2}px * var(--scale-factor))`;
-    this.translate(0, -(size2 - __privateGet(this, _fontSize)) * this.parentScale);
-    __privateSet(this, _fontSize, size2);
+  const setFontsize = (size) => {
+    this.editorDiv.style.fontSize = `calc(${size}px * var(--scale-factor))`;
+    this.translate(0, -(size - __privateGet(this, _fontSize)) * this.parentScale);
+    __privateSet(this, _fontSize, size);
     __privateMethod(this, _FreeTextEditor_instances, setEditorDimensions_fn).call(this);
   };
   const savedFontsize = __privateGet(this, _fontSize);
@@ -17445,8 +17445,8 @@ var FreeDrawOutline = class extends Outline {
   get box() {
     return __privateGet(this, _bbox);
   }
-  newOutliner(point2, box, scaleFactor, thickness, isLTR, innerMargin = 0) {
-    return new FreeDrawOutliner(point2, box, scaleFactor, thickness, isLTR, innerMargin);
+  newOutliner(point3, box, scaleFactor, thickness, isLTR, innerMargin = 0) {
+    return new FreeDrawOutliner(point3, box, scaleFactor, thickness, isLTR, innerMargin);
   }
   getNewOutline(thickness, innerMargin) {
     const [x, y, width, height] = __privateGet(this, _bbox);
@@ -17772,8 +17772,8 @@ var FreeHighlightOutliner = class extends FreeDrawOutliner {
   }
 };
 var FreeHighlightOutline = class extends FreeDrawOutline {
-  newOutliner(point2, box, scaleFactor, thickness, isLTR, innerMargin = 0) {
-    return new FreeHighlightOutliner(point2, box, scaleFactor, thickness, isLTR, innerMargin);
+  newOutliner(point3, box, scaleFactor, thickness, isLTR, innerMargin = 0) {
+    return new FreeHighlightOutliner(point3, box, scaleFactor, thickness, isLTR, innerMargin);
   }
 };
 var _button, _buttonSwatch, _defaultColor, _dropdown, _dropdownWasFromKeyboard, _isMainColorPicker, _editor3, _eventBus, _openDropdownAC, _uiManager2, _type, _l10nColor, _ColorPicker_instances, getDropdownRoot_fn, colorSelect_fn, keyDown_fn2, openDropdown_fn, pointerDown_fn2, isDropdownVisible_get;
@@ -18484,15 +18484,15 @@ var _HighlightEditor = class _HighlightEditor extends AnnotationEditor {
     } else if (inkLists) {
       __privateSet(editor, _isFreeHighlight, true);
       const points = inkLists[0];
-      const point2 = {
+      const point3 = {
         x: points[0] - pageX,
         y: pageHeight - (points[1] - pageY)
       };
-      const outliner = new FreeHighlightOutliner(point2, [0, 0, pageWidth, pageHeight], 1, __privateGet(editor, _thickness2) / 2, true, 1e-3);
+      const outliner = new FreeHighlightOutliner(point3, [0, 0, pageWidth, pageHeight], 1, __privateGet(editor, _thickness2) / 2, true, 1e-3);
       for (let i = 0, ii = points.length; i < ii; i += 2) {
-        point2.x = points[i] - pageX;
-        point2.y = pageHeight - (points[i + 1] - pageY);
-        outliner.add(point2);
+        point3.x = points[i] - pageX;
+        point3.y = pageHeight - (points[i + 1] - pageY);
+        outliner.add(point3);
       }
       const {
         id,
@@ -19886,23 +19886,23 @@ var _InkDrawOutline = class _InkDrawOutline extends Outline {
     }
     if (!lines) {
       lines = [];
-      for (const point2 of points) {
-        const len = point2.length;
+      for (const point3 of points) {
+        const len = point3.length;
         if (len === 2) {
-          lines.push(new Float32Array([NaN, NaN, NaN, NaN, point2[0], point2[1]]));
+          lines.push(new Float32Array([NaN, NaN, NaN, NaN, point3[0], point3[1]]));
           continue;
         }
         if (len === 4) {
-          lines.push(new Float32Array([NaN, NaN, NaN, NaN, point2[0], point2[1], NaN, NaN, NaN, NaN, point2[2], point2[3]]));
+          lines.push(new Float32Array([NaN, NaN, NaN, NaN, point3[0], point3[1], NaN, NaN, NaN, NaN, point3[2], point3[3]]));
           continue;
         }
         const line = new Float32Array(3 * (len - 2));
         lines.push(line);
-        let [x1, y1, x2, y2] = point2.subarray(0, 4);
+        let [x1, y1, x2, y2] = point3.subarray(0, 4);
         line.set([NaN, NaN, NaN, NaN, x1, y1], 0);
         for (let i = 4; i < len; i += 2) {
-          const x = point2[i];
-          const y = point2[i + 1];
+          const x = point3[i];
+          const y = point3[i + 1];
           line.set(Outline.createBezierPoints(x1, y1, x2, y2, x, y), (i - 2) * 3);
           [x1, y1, x2, y2] = [x2, y2, x, y];
         }
@@ -21993,6 +21993,127 @@ var __webpack_exports__shadow = __webpack_exports__.shadow;
 var __webpack_exports__stopEvent = __webpack_exports__.stopEvent;
 var __webpack_exports__version = __webpack_exports__.version;
 
+// src/board-model.ts
+var record = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var point = (value) => record(value) && typeof value.x === "number" && Number.isFinite(value.x) && typeof value.y === "number" && Number.isFinite(value.y);
+var pageKey = (page) => `p:${page}`;
+var cardKey = (id) => `a:${id}`;
+function readLayout(value) {
+  if (!record(value) || value.version !== 1 || !record(value.pages) || !record(value.cards) || !Array.isArray(value.groups) || typeof value.snap !== "boolean") throw new Error("Invalid canvas layout. The saved annotations have not been changed.");
+  if (!Object.entries(value.pages).every(([key, pos]) => /^[1-9]\d*$/.test(key) && point(pos)) || !Object.values(value.cards).every(point)) throw new Error("Invalid canvas position.");
+  const ids = /* @__PURE__ */ new Set(), members = /* @__PURE__ */ new Set();
+  for (const group of value.groups) {
+    if (!record(group) || typeof group.id !== "string" || ids.has(group.id) || typeof group.name !== "string" || !Array.isArray(group.members) || !group.members.every((key) => typeof key === "string" && /^(p:[1-9]\d*|a:.+)$/.test(key) && !members.has(key) && !!members.add(key))) throw new Error("Invalid canvas group.");
+    ids.add(group.id);
+  }
+  return structuredClone(value);
+}
+function emptyLayout() {
+  return { version: 1, pages: {}, cards: {}, groups: [], snap: false };
+}
+function estimatedHeight(annotation) {
+  const text = annotation.comment || annotation.text;
+  return 145 + Math.min(340, text.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 35)), 0) * 29) + (annotation.tags?.length ? 38 : 0);
+}
+function cleanLayout(layout, sizes, annotations) {
+  const valid = /* @__PURE__ */ new Set([...sizes.map((_, index) => pageKey(index + 1)), ...annotations.map((a) => cardKey(a.id))]);
+  for (const id of Object.keys(layout.cards)) if (!valid.has(cardKey(id))) delete layout.cards[id];
+  for (const page of Object.keys(layout.pages)) if (!valid.has(pageKey(Number(page)))) delete layout.pages[page];
+  layout.groups = layout.groups.map((group) => ({ ...group, members: group.members.filter((key) => valid.has(key)) })).filter((group) => group.members.length);
+}
+function ensureLayout(layout, sizes, annotations, heights = /* @__PURE__ */ new Map()) {
+  cleanLayout(layout, sizes, annotations);
+  let bottom = 0;
+  sizes.forEach((size, index) => {
+    var _a;
+    const page = index + 1, items = annotations.filter((a) => a.page === page);
+    const origin = (_a = layout.pages)[page] ?? (_a[page] = { x: 0, y: bottom });
+    let leftY = origin.y + 28, rightY = origin.y + 28;
+    items.forEach((annotation, i) => {
+      var _a2, _b;
+      const left = i % 2 === 0;
+      const pos = (_a2 = layout.cards)[_b = annotation.id] ?? (_a2[_b] = annotation.position ? { x: origin.x + annotation.position.x, y: origin.y + annotation.position.y } : { x: origin.x + (left ? -460 : size.width + 90), y: left ? leftY : rightY });
+      const end = pos.y + (heights.get(annotation.id) ?? estimatedHeight(annotation)) + 32;
+      if (pos.x < origin.x) leftY = Math.max(leftY, end);
+      else rightY = Math.max(rightY, end);
+    });
+    bottom = Math.max(bottom, origin.y + size.height, leftY, rightY) + 150;
+  });
+}
+function arrangeLayout(layout, sizes, annotations, heights) {
+  cleanLayout(layout, sizes, annotations);
+  let y = 0;
+  sizes.forEach((size, index) => {
+    const page = index + 1;
+    layout.pages[page] = { x: 0, y };
+    let left = y + 28, right = y + 28;
+    annotations.filter((a) => a.page === page).forEach((annotation, i) => {
+      layout.cards[annotation.id] = { x: i % 2 === 0 ? -460 : size.width + 90, y: i % 2 === 0 ? left : right };
+      const height = (heights.get(annotation.id) ?? estimatedHeight(annotation)) + 32;
+      if (i % 2 === 0) left += height;
+      else right += height;
+    });
+    y = Math.max(y + size.height, left, right) + 150;
+  });
+}
+function enclosingBounds(boxes, padding = 0) {
+  if (!boxes.length) return { x: 0, y: 0, width: 1, height: 1 };
+  const x = Math.min(...boxes.map((box) => box.x)) - padding, y = Math.min(...boxes.map((box) => box.y)) - padding;
+  return { x, y, width: Math.max(...boxes.map((box) => box.x + box.width)) - x + padding, height: Math.max(...boxes.map((box) => box.y + box.height)) - y + padding };
+}
+var intersects = (a, b) => a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
+function snappedDelta(moving, delta, others, tolerance) {
+  const out = { ...delta };
+  for (const axis of ["x", "y"]) {
+    const length = axis === "x" ? "width" : "height", start = moving[axis] + delta[axis];
+    let correction = Math.round(start / 20) * 20 - start;
+    if (Math.abs(correction) > tolerance) correction = 0;
+    let distance = correction ? Math.abs(correction) : tolerance;
+    for (const other of others) for (const edge of [0, 0.5, 1]) for (const target of [0, 0.5, 1]) {
+      const gap = other[axis] + target * other[length] - start - edge * moving[length];
+      if (Math.abs(gap) < distance) {
+        correction = gap;
+        distance = Math.abs(gap);
+      }
+    }
+    out[axis] += correction;
+  }
+  return out;
+}
+var LayoutHistory = class {
+  constructor() {
+    this.past = [];
+    this.future = [];
+  }
+  commit(before, after) {
+    if (JSON.stringify(before) === JSON.stringify(after)) return false;
+    this.past.push(structuredClone(before));
+    if (this.past.length > 100) this.past.shift();
+    this.future = [];
+    return true;
+  }
+  undo(current) {
+    const prior = this.past.pop();
+    if (prior) this.future.push(structuredClone(current));
+    return prior;
+  }
+  redo(current) {
+    const next = this.future.pop();
+    if (next) this.past.push(structuredClone(current));
+    return next;
+  }
+  get canUndo() {
+    return this.past.length > 0;
+  }
+  get canRedo() {
+    return this.future.length > 0;
+  }
+  clear() {
+    this.past = [];
+    this.future = [];
+  }
+};
+
 // src/model.ts
 var PDF_SCALE = 1.35;
 var CARD_WIDTH = 370;
@@ -22005,27 +22126,27 @@ var CATEGORIES = {
   note: { label: "Note", color: "yellow", hex: "#f4d653", icon: "sticky-note" }
 };
 var finite = (n) => typeof n === "number" && Number.isFinite(n);
-var record = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var point = (value) => record(value) && finite(value.x) && finite(value.y);
-var quad = (value) => record(value) && finite(value.x) && finite(value.y) && finite(value.w) && finite(value.h) && value.w > 0 && value.h > 0;
+var record2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var point2 = (value) => record2(value) && finite(value.x) && finite(value.y);
+var quad = (value) => record2(value) && finite(value.x) && finite(value.y) && finite(value.w) && finite(value.h) && value.w > 0 && value.h > 0;
 var unknownArray = (value) => Array.isArray(value);
 var stringArray = (value) => unknownArray(value) && value.every((item) => typeof item === "string");
 var categoryKey = (value) => typeof value === "string" && (Object.prototype.hasOwnProperty.call(CATEGORIES, value) || /^custom-[a-z0-9-]{1,80}$/.test(value));
-var categoryStyle = (value) => record(value) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 60 && typeof value.color === "string" && typeof value.hex === "string" && /^#[0-9a-f]{6}$/i.test(value.hex) && typeof value.icon === "string" && /^[a-z0-9-]{1,60}$/.test(value.icon);
+var categoryStyle = (value) => record2(value) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 60 && typeof value.color === "string" && typeof value.hex === "string" && /^#[0-9a-f]{6}$/i.test(value.hex) && typeof value.icon === "string" && /^[a-z0-9-]{1,60}$/.test(value.icon);
 function defaultCategoryStyle(id) {
   if (Object.prototype.hasOwnProperty.call(CATEGORIES, id)) return CATEGORIES[id];
   return { label: "Unknown category", color: "gray", hex: "#94a3b8", icon: "tag" };
 }
 function readSidecar(raw, pdfPath) {
   const data = JSON.parse(raw);
-  if (!record(data) || data.version !== 1 && data.version !== 2 || !unknownArray(data.annotations) || data.notes !== void 0 && typeof data.notes !== "string") {
+  if (!record2(data) || data.version !== 1 && data.version !== 2 || !unknownArray(data.annotations) || data.notes !== void 0 && typeof data.notes !== "string") {
     throw new Error("Unknown or damaged annotation format.");
   }
   const legacy = { red: "limitation", yellow: "note", green: "evidence", blue: "method", orange: "note", purple: "evidence" };
   const oldCategories = { criticism: "limitation", question: "note", positive: "evidence", unclear: "note", literature: "evidence" };
   const ids = /* @__PURE__ */ new Set();
   const annotations = data.annotations.map((a) => {
-    if (!record(a) || typeof a.id !== "string" || ids.has(a.id) || !finite(a.page) || !Number.isInteger(a.page) || a.page < 1 || !unknownArray(a.quads) || !a.quads.length || !a.quads.every(quad) || typeof a.text !== "string" || !finite(a.createdAt) || !finite(a.updatedAt) || a.position !== void 0 && !point(a.position) || a.title !== void 0 && typeof a.title !== "string" || a.comment !== void 0 && typeof a.comment !== "string" || a.tags !== void 0 && !stringArray(a.tags) || a.categoryStyle !== void 0 && !categoryStyle(a.categoryStyle)) {
+    if (!record2(a) || typeof a.id !== "string" || ids.has(a.id) || !finite(a.page) || !Number.isInteger(a.page) || a.page < 1 || !unknownArray(a.quads) || !a.quads.length || !a.quads.every(quad) || typeof a.text !== "string" || !finite(a.createdAt) || !finite(a.updatedAt) || a.position !== void 0 && !point2(a.position) || a.title !== void 0 && typeof a.title !== "string" || a.comment !== void 0 && typeof a.comment !== "string" || a.tags !== void 0 && !stringArray(a.tags) || a.categoryStyle !== void 0 && !categoryStyle(a.categoryStyle)) {
       throw new Error("An annotation contains invalid data.");
     }
     ids.add(a.id);
@@ -22051,6 +22172,7 @@ function readSidecar(raw, pdfPath) {
       color: a.categoryStyle?.color ?? defaultCategoryStyle(category).color
     };
   });
+  if (data.canvasLayout !== void 0) data.canvasLayout = readLayout(data.canvasLayout);
   return { ...data, pdfPath, version: 2, annotations, notes: data.notes ?? "" };
 }
 function defaultPosition(index, pageWidth) {
@@ -22064,15 +22186,8 @@ function connection(card, quad2) {
   const direction = onLeft ? 1 : -1;
   return { path: `M ${start.x} ${start.y} C ${start.x + bend * direction} ${start.y}, ${anchor.x - bend * direction} ${anchor.y}, ${anchor.x} ${anchor.y}`, anchor };
 }
-function sceneBounds(pageWidth, pageHeight, cards) {
-  const left = Math.min(0, ...cards.map((c) => c.x));
-  const top = Math.min(0, ...cards.map((c) => c.y));
-  const right = Math.max(pageWidth, ...cards.map((c) => c.x + c.width));
-  const bottom = Math.max(pageHeight, ...cards.map((c) => c.y + c.height));
-  return { x: left - 45, y: top - 45, width: right - left + 90, height: bottom - top + 90 };
-}
 function fitCamera(bounds, width, height) {
-  const zoom = Math.max(0.1, Math.min(1.5, width / bounds.width, height / bounds.height));
+  const zoom = Math.max(1e-4, Math.min(1.5, width / bounds.width, height / bounds.height));
   return { zoom, x: (width - bounds.width * zoom) / 2 - bounds.x * zoom, y: (height - bounds.height * zoom) / 2 - bounds.y * zoom };
 }
 
@@ -22121,6 +22236,45 @@ var DeleteCommentModal = class extends import_obsidian.Modal {
       this.confirm();
     };
     cancel.focus();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var GroupNameModal = class extends import_obsidian.Modal {
+  constructor(app, name, theme, submit) {
+    super(app);
+    this.name = name;
+    this.theme = theme;
+    this.submit = submit;
+  }
+  onOpen() {
+    applyModalTheme(this, this.theme);
+    this.setTitle(this.name ? "Rename group" : "Create group");
+    const id = `pdfaw-group-${crypto.randomUUID()}`;
+    this.contentEl.createEl("label", { text: "Group name", attr: { for: id } });
+    const input = this.contentEl.createEl("input", { cls: "pdfaw-group-name", attr: { id, type: "text", maxlength: "100", placeholder: "Group name" } });
+    input.value = this.name;
+    const actions = this.contentEl.createDiv({ cls: "pdfaw-modal-actions" });
+    actions.createEl("button", { text: "Cancel" }).onclick = () => this.close();
+    const save = () => {
+      const name = input.value.trim();
+      if (!name) {
+        input.focus();
+        return;
+      }
+      this.submit(name);
+      this.close();
+    };
+    actions.createEl("button", { text: "Save", cls: "mod-cta" }).onclick = save;
+    input.onkeydown = (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        save();
+      }
+    };
+    input.focus();
+    input.select();
   }
   onClose() {
     this.contentEl.empty();
@@ -22705,320 +22859,172 @@ var Sidebars = class {
   }
 };
 
-// src/native-canvas.ts
-var import_obsidian7 = require("obsidian");
-
-// src/canvas-model.ts
-var object = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var finite2 = (value) => typeof value === "number" && Number.isFinite(value);
-var size = (value) => object(value) && finite2(value.width) && value.width > 0 && finite2(value.height) && value.height > 0;
-function readCanvas(raw, pdfPath) {
-  const data = JSON.parse(raw);
-  if (!object(data) || !Array.isArray(data.nodes) || !Array.isArray(data.edges) || !object(data.remarkMyWords)) throw new Error("This is not a Remark My Words canvas.");
-  const meta = data.remarkMyWords;
-  if (meta.version !== 1 || typeof meta.pdfPath !== "string" || pdfPath && meta.pdfPath !== pdfPath || !Array.isArray(meta.pages) || !meta.pages.length || !meta.pages.every(size) || !Array.isArray(meta.annotations) || !meta.annotations.every((id) => typeof id === "string")) throw new Error("Invalid PDF canvas metadata.");
-  const ids = /* @__PURE__ */ new Set();
-  for (const node of data.nodes) {
-    if (!object(node) || typeof node.id !== "string" || ids.has(node.id) || !["text", "file", "link", "group"].includes(String(node.type)) || !size(node) || !finite2(node.x) || !finite2(node.y)) throw new Error("Invalid canvas card.");
-    if (node.remarkMyWords !== void 0 && (!object(node.remarkMyWords) || !Number.isInteger(node.remarkMyWords.page) || Number(node.remarkMyWords.page) < 1 || node.remarkMyWords.annotation !== void 0 && typeof node.remarkMyWords.annotation !== "string" || node.remarkMyWords.sourceText !== void 0 && typeof node.remarkMyWords.sourceText !== "string")) throw new Error("Invalid PDF card mapping.");
-    ids.add(node.id);
+// src/pdf-pages.ts
+var PdfPages = class {
+  constructor(stage, win, created) {
+    this.stage = stage;
+    this.win = win;
+    this.created = created;
+    this.surfaces = /* @__PURE__ */ new Map();
+    this.generation = 0;
+    this.active = 1;
+    this.running = 0;
   }
-  const edgeIds = /* @__PURE__ */ new Set();
-  for (const edge of data.edges) {
-    if (!object(edge) || typeof edge.id !== "string" || edgeIds.has(edge.id) || typeof edge.fromNode !== "string" || typeof edge.toNode !== "string" || !ids.has(edge.fromNode) || !ids.has(edge.toNode)) throw new Error("Invalid canvas connection.");
-    edgeIds.add(edge.id);
+  get sizes() {
+    return [...this.surfaces.values()].map(({ width, height }) => ({ width, height }));
   }
-  return data;
-}
-function commentText(annotation, style, pdfPath, vault) {
-  const link = `obsidian://remark-my-words?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(pdfPath)}&page=${annotation.page}&comment=${encodeURIComponent(annotation.id)}`;
-  return [`## ${annotation.title || style.label}`, annotation.comment || "", `> ${annotation.text.replace(/\n/g, "\n> ")}`, `${style.label} \xB7 Page ${annotation.page}`, annotation.tags?.map((tag) => `#${tag}`).join(" ") ?? "", `[Edit source comment](${link})`].filter(Boolean).join("\n\n");
-}
-function textHeight(text, width = 370) {
-  const chars = Math.max(15, Math.floor((width - 40) / 8));
-  return Math.max(220, Math.min(1600, 60 + text.split("\n").reduce((lines, line) => lines + Math.max(1, Math.ceil(line.length / chars)), 0) * 24));
-}
-function updateCanvas(previous, sidecar, pages, style, vault) {
-  const data = previous ? structuredClone(previous) : { nodes: [], edges: [], remarkMyWords: { version: 1, pdfPath: sidecar.pdfPath, pages: [], annotations: [] } };
-  const oldPages = data.remarkMyWords.pages.length;
-  let bottom = data.nodes.reduce((max, node) => Math.max(max, node.y + node.height), -120) + 120;
-  pages.forEach((page, index) => {
-    if (index < oldPages || data.nodes.some((node) => node.remarkMyWords?.page === index + 1 && !node.remarkMyWords.annotation)) return;
-    data.nodes.push({ id: crypto.randomUUID(), type: "file", file: sidecar.pdfPath, subpath: `#page=${index + 1}`, x: 0, y: bottom, width: Math.ceil(page.width), height: Math.ceil(page.height) + 40, remarkMyWords: { page: index + 1 } });
-    bottom += Math.ceil(page.height) + 160;
-  });
-  const known = new Set(data.remarkMyWords.annotations), current = new Set(sidecar.annotations.map((annotation) => annotation.id));
-  const removed = /* @__PURE__ */ new Set();
-  for (const node of data.nodes) {
-    if (!node.remarkMyWords?.annotation || current.has(node.remarkMyWords.annotation)) continue;
-    if (node.text === node.remarkMyWords.sourceText) removed.add(node.id);
-    else delete node.remarkMyWords;
-  }
-  data.nodes = data.nodes.filter((node) => !removed.has(node.id));
-  data.edges = data.edges.filter((edge) => !removed.has(edge.fromNode) && !removed.has(edge.toNode));
-  for (const annotation of sidecar.annotations) {
-    const category = style(annotation), text = commentText(annotation, category, sidecar.pdfPath, vault);
-    const existing = data.nodes.find((node) => node.remarkMyWords?.annotation === annotation.id);
-    if (existing) {
-      if (existing.text === existing.remarkMyWords?.sourceText) {
-        existing.text = text;
-        existing.color = category.hex;
-        existing.remarkMyWords = { page: annotation.page, annotation: annotation.id, sourceText: text };
-      }
-    } else if (!known.has(annotation.id)) {
-      const page = data.nodes.find((node) => node.remarkMyWords?.page === annotation.page && !node.remarkMyWords.annotation);
-      if (!page) continue;
-      const siblings = data.nodes.filter((node) => node.remarkMyWords?.annotation && node.remarkMyWords.page === annotation.page);
-      const left = siblings.length % 2 === 0;
-      const y = Math.max(page.y + 24, ...siblings.filter((node) => left ? node.x < page.x : node.x > page.x).map((node) => node.y + node.height + 32));
-      const id = crypto.randomUUID();
-      data.nodes.push({ id, type: "text", text, color: category.hex, x: left ? page.x - 460 : page.x + page.width + 90, y, width: 370, height: textHeight(text), remarkMyWords: { page: annotation.page, annotation: annotation.id, sourceText: text } });
-      data.edges.push({ id: crypto.randomUUID(), fromNode: page.id, toNode: id, fromSide: left ? "left" : "right", toSide: left ? "right" : "left", color: category.hex, toEnd: "none" });
+  async prepare(pdf) {
+    this.clear();
+    const token = this.generation;
+    for (let number = 1; number <= pdf.numPages; number++) {
+      const page = await pdf.getPage(number);
+      if (token !== this.generation) return;
+      const size = page.getViewport({ scale: PDF_SCALE });
+      const shell = this.stage.createDiv({ cls: "pdfaw-page-node", attr: { "data-page": String(number), "data-node": `p:${number}` } });
+      shell.style.width = `${size.width}px`;
+      shell.style.height = `${size.height}px`;
+      const header = shell.createDiv({ cls: "pdfaw-page-handle", text: `Page ${number}`, attr: { tabindex: "0", "aria-label": `Move page ${number}` } });
+      const body = shell.createDiv({ cls: "pdfaw-page", attr: { "data-page": String(number) } });
+      body.style.width = `${size.width}px`;
+      body.style.height = `${size.height}px`;
+      body.style.setProperty("--scale-factor", String(PDF_SCALE));
+      const surface = { number, shell, header, body, page, width: size.width, height: size.height, canvas: null, textLayer: null, task: null, density: 0, requested: 0, revision: 0, wanted: false, textWanted: false, failed: false, pending: null };
+      this.surfaces.set(number, surface);
+      this.created(surface);
     }
   }
-  data.remarkMyWords = { version: 1, pdfPath: sidecar.pdfPath, pages, annotations: sidecar.annotations.map((annotation) => annotation.id) };
-  return previous ? data : arrangeCanvas(data);
-}
-function arrangeCanvas(input) {
-  const data = structuredClone(input);
-  const groups = data.nodes.filter((node) => node.type === "group").map((group) => ({ group, members: data.nodes.filter((node) => node !== group && node.x >= group.x && node.y >= group.y && node.x + node.width <= group.x + group.width && node.y + node.height <= group.y + group.height) })).sort((a, b) => a.group.width * a.group.height - b.group.width * b.group.height);
-  let y = 0;
-  const pages = data.nodes.filter((node) => node.remarkMyWords && !node.remarkMyWords.annotation).sort((a, b) => a.remarkMyWords.page - b.remarkMyWords.page);
-  for (const page of pages) {
-    page.x = 0;
-    page.y = y;
-    let leftY = y + 24, rightY = y + 24;
-    const comments = data.nodes.filter((node) => node.remarkMyWords?.annotation && node.remarkMyWords.page === page.remarkMyWords.page);
-    comments.forEach((node, index) => {
-      const left = index % 2 === 0;
-      node.x = left ? -node.width - 90 : page.width + 90;
-      node.y = left ? leftY : rightY;
-      if (left) leftY += node.height + 32;
-      else rightY += node.height + 32;
-      for (const edge of data.edges) if (edge.fromNode === page.id && edge.toNode === node.id) {
-        edge.fromSide = left ? "left" : "right";
-        edge.toSide = left ? "right" : "left";
+  update(mode, current, zoom, viewport) {
+    this.active = current;
+    const area = viewport.getBoundingClientRect(), selection = this.win.getSelection();
+    const wanted = [];
+    for (const surface of this.surfaces.values()) {
+      surface.shell.hidden = mode === "reading" && surface.number !== current;
+      const box = surface.body.getBoundingClientRect();
+      const selected = !!selection?.rangeCount && !selection.isCollapsed && surface.body.contains(selection.anchorNode);
+      surface.wanted = mode === "reading" ? surface.number === current : selected || box.right >= area.left - 160 && box.left <= area.right + 160 && box.bottom >= area.top - 160 && box.top <= area.bottom + 160;
+      surface.textWanted = mode === "reading" || selected || zoom >= 0.18;
+      if (surface.wanted) wanted.push(surface);
+      else this.evict(surface);
+    }
+    const budget = Math.min(16777216, 33554432 / Math.max(1, wanted.length));
+    for (const surface of wanted) {
+      const density = Math.min(zoom * (this.win.devicePixelRatio || 1), Math.sqrt(budget / (surface.width * surface.height)), 8192 / Math.max(surface.width, surface.height));
+      if (Math.abs(density - surface.requested) > 1e-4) {
+        surface.requested = density;
+        surface.revision++;
+        surface.task?.cancel();
+      }
+    }
+    this.win.clearTimeout(this.timer);
+    this.timer = this.win.setTimeout(() => {
+      this.timer = void 0;
+      this.pump();
+    }, 120);
+  }
+  async ensure(number) {
+    const surface = this.surfaces.get(number);
+    if (!surface) return;
+    surface.failed = false;
+    surface.body.querySelectorAll(".pdfaw-error").forEach((el) => el.remove());
+    while (surface.wanted) {
+      if (!surface.pending && surface.canvas && (!surface.textWanted || surface.textLayer) && Math.abs(surface.density - surface.requested) < 1e-4) return;
+      if (!surface.pending) this.pump();
+      const pending = surface.pending ?? [...this.surfaces.values()].find((item) => item.pending !== null)?.pending;
+      if (!pending) return;
+      await pending;
+      if (surface.failed) return;
+    }
+  }
+  pump() {
+    const surfaces = [...this.surfaces.values()].sort((a, b) => Math.abs(a.number - this.active) - Math.abs(b.number - this.active));
+    for (const surface of surfaces) {
+      if (this.running >= 2) break;
+      if (surface.wanted && !surface.pending && !surface.failed && (Math.abs(surface.density - surface.requested) > 1e-4 || surface.textWanted && !surface.textLayer)) this.start(surface);
+    }
+  }
+  start(surface) {
+    const token = this.generation;
+    this.running++;
+    const work = this.render(surface);
+    surface.pending = work.finally(() => {
+      if (surface.pending === pending) surface.pending = null;
+      if (token === this.generation) {
+        this.running--;
+        this.pump();
       }
     });
-    y = Math.max(y + page.height, leftY, rightY) + 120;
+    const pending = surface.pending;
   }
-  for (const { group, members } of groups) {
-    if (!members.some((node) => node.remarkMyWords)) continue;
-    group.x = Math.min(...members.map((node) => node.x)) - 40;
-    group.y = Math.min(...members.map((node) => node.y)) - 60;
-    group.width = Math.max(...members.map((node) => node.x + node.width)) - group.x + 40;
-    group.height = Math.max(...members.map((node) => node.y + node.height)) - group.y + 40;
-  }
-  return data;
-}
-
-// src/native-canvas.ts
-var NativeCanvas = class {
-  constructor(app, categories, sidebars, read) {
-    this.app = app;
-    this.categories = categories;
-    this.sidebars = sidebars;
-    this.read = read;
-    this.actions = /* @__PURE__ */ new Map();
-    this.page = /* @__PURE__ */ new Map();
-    this.revision = 0;
-    this.busy = false;
-  }
-  destroy() {
-    this.revision++;
-    this.actions.forEach((elements) => elements.forEach((el) => el.remove()));
-    this.actions.clear();
-  }
-  cancelActivation() {
-    this.revision++;
-  }
-  owns(leaf) {
-    const view = this.view(leaf);
-    if (!view) return false;
+  async render(surface) {
+    const revision = surface.revision, token = this.generation, density = surface.requested;
+    const valid = () => token === this.generation && surface.revision === revision && surface.wanted;
     try {
-      readCanvas(view.getViewData());
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  pruneActions() {
-    const live = new Set(this.app.workspace.getLeavesOfType("canvas").map((leaf) => leaf.view));
-    for (const [view, elements] of this.actions) if (!live.has(view)) {
-      elements.forEach((el) => el.remove());
-      this.actions.delete(view);
-    }
-  }
-  view(leaf) {
-    return leaf?.view instanceof import_obsidian7.TextFileView && leaf.view.getViewType() === "canvas" ? leaf.view : null;
-  }
-  live(path) {
-    return this.app.workspace.getLeavesOfType("canvas").map((leaf) => this.view(leaf)).find((view) => view?.file?.path === path) ?? null;
-  }
-  async open(file, sidecar, pages) {
-    if (this.busy) return;
-    this.busy = true;
-    try {
-      const path = `${file.path}.remark.canvas`;
-      let target = this.app.vault.getAbstractFileByPath(path);
-      const live = this.live(path);
-      if (target && !(target instanceof import_obsidian7.TFile)) throw new Error("The canvas path is already used by a folder.");
-      if (target instanceof import_obsidian7.TFile) {
-        const old = readCanvas(live ? live.getViewData() : await this.app.vault.read(target), file.path);
-        const next = updateCanvas(old, sidecar, pages, (annotation) => this.categories.forAnnotation(annotation), this.app.vault.getName());
-        if (live) await this.write(live, next);
-        else await this.app.vault.process(target, (raw) => JSON.stringify(updateCanvas(readCanvas(raw, file.path), sidecar, pages, (annotation) => this.categories.forAnnotation(annotation), this.app.vault.getName()), null, 2));
-      } else {
-        target = await this.app.vault.create(path, JSON.stringify(updateCanvas(null, sidecar, pages, (annotation) => this.categories.forAnnotation(annotation), this.app.vault.getName()), null, 2));
-      }
-      const leaf = live?.leaf ?? this.app.workspace.getLeaf("tab");
-      if (!(target instanceof import_obsidian7.TFile)) throw new Error("The canvas file could not be created.");
-      await leaf.openFile(target);
-      await this.app.workspace.revealLeaf(leaf);
-      this.app.workspace.setActiveLeaf(leaf, { focus: true });
-      if (!this.view(leaf)) throw new Error("Enable the Canvas core plugin in Obsidian to open this canvas.");
-      await this.activate(leaf);
-      await this.sidebars.show(PAGES_VIEW);
-      this.jump(leaf, this.page.get(path) ?? 1);
-    } catch (error) {
-      this.report(error);
-    } finally {
-      this.busy = false;
-    }
-  }
-  async activate(leaf) {
-    const view = this.view(leaf), token = ++this.revision;
-    if (!view?.file) return false;
-    let data;
-    try {
-      data = readCanvas(view.getViewData());
-    } catch {
-      return false;
-    }
-    const pdf = this.app.vault.getAbstractFileByPath(data.remarkMyWords.pdfPath);
-    if (!(pdf instanceof import_obsidian7.TFile)) {
-      this.sidebars.update(null);
-      return false;
-    }
-    if (!this.actions.has(view)) {
-      const elements = [
-        view.addAction("book-open", "Read and annotate PDF", () => {
-          void this.read(pdf, this.page.get(view.file.path) ?? 1);
-        }),
-        view.addAction("files", "PDF pages", () => {
-          void this.activate(view.leaf).then(() => this.sidebars.show(PAGES_VIEW));
-        }),
-        view.addAction("messages-square", "Read page comments", () => {
-          void this.activate(view.leaf).then(() => this.sidebars.show(COMMENTS_VIEW));
-        }),
-        view.addAction("layout-dashboard", "Rearrange pages and comments", () => {
-          void this.rearrange(view.leaf);
-        }),
-        view.addAction("refresh-cw", "Refresh comments from PDF", () => {
-          void this.refresh(view.leaf);
-        })
-      ];
-      this.actions.set(view, elements);
-    }
-    try {
-      const sidecar = await this.sidecar(pdf);
-      if (token !== this.revision) return true;
-      this.sidebars.update({
-        owner: view,
-        name: pdf.name,
-        page: this.page.get(view.file.path) ?? 1,
-        pages: data.remarkMyWords.pages.length,
-        annotations: sidecar.annotations,
-        jump: (page) => this.jump(view.leaf, page),
-        edit: (annotation) => {
-          void this.read(pdf, annotation.page, annotation);
-        },
-        remove: (annotation) => {
-          void this.read(pdf, annotation.page, annotation, true);
-        },
-        rearrange: () => {
-          void this.rearrange(view.leaf);
-        },
-        refresh: () => {
-          void this.refresh(view.leaf);
-        },
-        read: () => {
-          void this.read(pdf, this.page.get(view.file.path) ?? 1);
+      if (!surface.canvas || Math.abs(surface.density - density) > 1e-4) {
+        const viewport = surface.page.getViewport({ scale: PDF_SCALE });
+        const canvas = this.stage.createEl("canvas");
+        canvas.setAttribute("aria-label", `PDF page ${surface.number}`);
+        canvas.remove();
+        canvas.width = Math.ceil(viewport.width * density);
+        canvas.height = Math.ceil(viewport.height * density);
+        canvas.setCssProps({ "--canvas-width": `${viewport.width}px`, "--canvas-height": `${viewport.height}px` });
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas unavailable.");
+        const task = surface.page.render({ canvasContext: context, viewport, transform: [canvas.width / viewport.width, 0, 0, canvas.height / viewport.height, 0, 0] });
+        surface.task = task;
+        try {
+          await task.promise;
+        } finally {
+          if (surface.task === task) surface.task = null;
         }
-      });
-    } catch (error) {
-      this.report(error);
-    }
-    return true;
-  }
-  async sidecar(file) {
-    const saved = this.app.vault.getAbstractFileByPath(`${file.path}.obsidian-annot.json`);
-    return saved instanceof import_obsidian7.TFile ? readSidecar(await this.app.vault.read(saved), file.path) : { version: 2, pdfPath: file.path, annotations: [], notes: "" };
-  }
-  jump(leaf, page) {
-    const view = this.view(leaf);
-    if (!view?.file) return;
-    try {
-      const data = readCanvas(view.getViewData());
-      if (page < 1 || page > data.remarkMyWords.pages.length) return;
-      const node = data.nodes.find((node2) => node2.remarkMyWords?.page === page && !node2.remarkMyWords.annotation);
-      if (!node) {
-        new import_obsidian7.Notice("This page card was removed from the canvas.");
-        return;
+        if (!valid()) return;
+        if (surface.canvas) surface.canvas.replaceWith(canvas);
+        else surface.body.prepend(canvas);
+        surface.canvas = canvas;
+        surface.density = density;
       }
-      const canvas = Reflect.get(view, "canvas");
-      if (typeof canvas !== "object" || canvas === null || !("zoomToBbox" in canvas) || typeof canvas.zoomToBbox !== "function") {
-        new import_obsidian7.Notice("Page navigation is unavailable in this Obsidian version. Use canvas zoom to selection.");
-        return;
+      if (!surface.textLayer && surface.textWanted) {
+        const content = await surface.page.getTextContent();
+        if (!valid()) return;
+        const container = surface.body.createDiv({ cls: "pdfaw-textlayer" });
+        const layer = new __webpack_exports__TextLayer({ textContentSource: content, container, viewport: surface.page.getViewport({ scale: PDF_SCALE }) });
+        surface.textLayer = layer;
+        try {
+          await layer.render();
+        } catch (error) {
+          container.remove();
+          if (surface.textLayer === layer) surface.textLayer = null;
+          throw error;
+        }
       }
-      canvas.zoomToBbox({ minX: node.x, minY: node.y, maxX: node.x + node.width, maxY: node.y + node.height });
-      this.page.set(view.file.path, page);
-      void this.activate(leaf);
     } catch (error) {
-      this.report(error);
+      if (!valid() || error instanceof __webpack_exports__RenderingCancelledException) return;
+      surface.failed = true;
+      surface.body.createDiv({ cls: "pdfaw-loading pdfaw-error", text: "Could not render this page. Select it in the page list to retry." });
+      console.error("Remark My Words: page", error);
     }
   }
-  async rearrange(leaf) {
-    const view = this.view(leaf);
-    if (!view || this.busy) return;
-    this.busy = true;
-    try {
-      await this.write(view, arrangeCanvas(readCanvas(view.getViewData())));
-      this.jump(leaf, this.page.get(view.file.path) ?? 1);
-    } catch (error) {
-      this.report(error);
-    } finally {
-      this.busy = false;
+  evict(surface) {
+    if (!surface.canvas && !surface.textLayer && !surface.pending) return;
+    surface.revision++;
+    surface.task?.cancel();
+    surface.textLayer?.cancel();
+    surface.textLayer = null;
+    surface.canvas?.remove();
+    surface.canvas = null;
+    surface.body.querySelector(".pdfaw-textlayer")?.remove();
+    surface.density = 0;
+  }
+  clear() {
+    this.generation++;
+    this.win.clearTimeout(this.timer);
+    this.timer = void 0;
+    this.running = 0;
+    for (const surface of this.surfaces.values()) {
+      surface.wanted = false;
+      this.evict(surface);
+      surface.shell.remove();
     }
-  }
-  async refresh(leaf) {
-    const view = this.view(leaf);
-    if (!view || this.busy) return;
-    this.busy = true;
-    try {
-      const initial = readCanvas(view.getViewData());
-      const file = this.app.vault.getAbstractFileByPath(initial.remarkMyWords.pdfPath);
-      if (!(file instanceof import_obsidian7.TFile)) throw new Error("The source PDF was not found.");
-      const source = await this.sidecar(file);
-      const current = readCanvas(view.getViewData(), file.path);
-      await this.write(view, updateCanvas(current, source, current.remarkMyWords.pages, (annotation) => this.categories.forAnnotation(annotation), this.app.vault.getName()));
-      await this.activate(leaf);
-    } catch (error) {
-      this.report(error);
-    } finally {
-      this.busy = false;
-    }
-  }
-  async write(view, data) {
-    const before = view.getViewData(), after = JSON.stringify(data, null, 2);
-    if (JSON.stringify(JSON.parse(before)) === JSON.stringify(data)) return;
-    view.setViewData(before, false);
-    view.setViewData(after, false);
-    await view.save();
-  }
-  report(error) {
-    new import_obsidian7.Notice(`Could not update PDF canvas: ${error instanceof Error ? error.message : String(error)}`);
-    console.error("Remark My Words: canvas", error);
+    this.surfaces.clear();
   }
 };
 
@@ -23031,12 +23037,11 @@ function svg(parent, tag, attrs) {
   parent.appendChild(el);
   return el;
 }
-var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView {
-  constructor(leaf, categories, sidebars, nativeCanvas) {
+var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian7.FileView {
+  constructor(leaf, categories, sidebars) {
     super(leaf);
     this.categories = categories;
     this.sidebars = sidebars;
-    this.nativeCanvas = nativeCanvas;
     this.mode = "reading";
     this.canvasCamera = null;
     this.modeButtons = /* @__PURE__ */ new Map();
@@ -23048,13 +23053,6 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.loading = null;
     this.workerUrl = null;
     this.renderTasks = /* @__PURE__ */ new Set();
-    this.pageTask = null;
-    this.rasterPage = null;
-    this.pageCanvas = null;
-    this.rasterDensity = 0;
-    this.requestedDensity = 0;
-    this.rasterRevision = 0;
-    this.textLayer = null;
     this.thumbObserver = null;
     this.resizeObserver = null;
     this.saveQueue = Promise.resolve();
@@ -23076,11 +23074,30 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.selectionDrag = null;
     this.activeId = null;
     this.gesture = null;
+    this.selectedNodes = /* @__PURE__ */ new Set();
+    this.multiSelect = false;
+    this.history = new LayoutHistory();
+    this.groupElements = /* @__PURE__ */ new Map();
     this.pinch = null;
     this.pinchActive = false;
     this.pageReady = false;
     this.geometryFrame = 0;
     this.fileReady = Promise.resolve();
+  }
+  get pageTask() {
+    return this.pages?.surfaces.get(this.currentPage)?.task ?? null;
+  }
+  get pageCanvas() {
+    return this.pages?.surfaces.get(this.currentPage)?.canvas ?? null;
+  }
+  get rasterDensity() {
+    return this.pages?.surfaces.get(this.currentPage)?.density ?? 0;
+  }
+  get requestedDensity() {
+    return this.pages?.surfaces.get(this.currentPage)?.requested ?? 0;
+  }
+  get rasterTimer() {
+    return this.pages?.timer;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -23099,7 +23116,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
   }
   button(parent, icon, label, action, cls = "") {
     const button = parent.createEl("button", { cls: `pdfaw-icon-button ${cls}`, attr: { "aria-label": label, type: "button" } });
-    (0, import_obsidian8.setIcon)(button, icon);
+    (0, import_obsidian7.setIcon)(button, icon);
     button.onclick = action;
     return button;
   }
@@ -23110,11 +23127,8 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.applyTheme();
     const toolbar = this.root.createDiv({ cls: "pdfaw-toolbar" });
     const modes = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-modes", attr: { "aria-label": "View mode" } });
-    this.button(modes, "layout-dashboard", "Canvas mode", () => {
-      void this.openNativeCanvas();
-    });
     for (const mode of ["canvas", "reading"]) {
-      const button = this.button(modes, mode === "canvas" ? "layout-panel-left" : "book-open", mode === "canvas" ? "Page layout" : "Reading mode", () => this.setMode(mode));
+      const button = this.button(modes, mode === "canvas" ? "layout-dashboard" : "book-open", mode === "canvas" ? "Canvas mode" : "Reading mode", () => this.setMode(mode));
       button.setAttribute("aria-pressed", String(this.mode === mode));
       this.modeButtons.set(mode, button);
     }
@@ -23145,7 +23159,21 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       this.updateSidebar();
       void this.sidebars.show(COMMENTS_VIEW);
     }, "pdfaw-read-comments");
-    this.button(right, "layout-dashboard", "Rearrange cards on this page", () => this.rearrangeCards());
+    this.button(right, "layout-dashboard", "Rearrange pages and comments", () => this.rearrangeCards(), "pdfaw-canvas-control");
+    this.undoButton = this.button(right, "undo-2", "Undo canvas change", () => this.restoreLayout(false), "pdfaw-canvas-control");
+    this.redoButton = this.button(right, "redo-2", "Redo canvas change", () => this.restoreLayout(true), "pdfaw-canvas-control");
+    this.snapButton = this.button(right, "magnet", "Snap to grid and objects", () => this.toggleSnap(), "pdfaw-canvas-control");
+    this.multiSelectButton = this.button(right, "list-checks", "Select multiple items", () => {
+      this.multiSelect = !this.multiSelect;
+      this.updateSelectionPaint();
+    }, "pdfaw-canvas-control");
+    const canvasActions = this.button(right, "ellipsis", "Canvas actions", () => {
+      if (!this.sidecar) return;
+      const menu = new import_obsidian7.Menu();
+      this.addLayoutMenu(menu);
+      menu.showAtPosition(this.menuPosition(canvasActions));
+    }, "pdfaw-canvas-control");
+    this.button(right, "group", "Group selection", () => this.groupSelection(), "pdfaw-canvas-control");
     this.button(right, "settings", "Customize", () => new CategoryModal(this.app, this.categories).open());
     this.button(right, "sticky-note", "Document notes", () => {
       this.root.toggleClass("pdfaw-show-notes", !this.root.hasClass("pdfaw-show-notes"));
@@ -23156,9 +23184,12 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.thumbnails = sidebar.createDiv({ cls: "pdfaw-thumbnails" });
     this.viewport = body.createDiv({ cls: "pdfaw-viewport" });
     this.stage = this.viewport.createDiv({ cls: "pdfaw-stage" });
+    this.groupsEl = this.stage.createDiv({ cls: "pdfaw-groups" });
     this.pageEl = this.stage.createDiv({ cls: "pdfaw-page" });
     this.links = svg(this.stage, "svg", { class: "pdfaw-connections", "aria-hidden": "true" });
     this.cardsEl = this.stage.createDiv({ cls: "pdfaw-cards" });
+    this.pages = new PdfPages(this.stage, this.win, (surface) => this.installPage(surface));
+    this.marqueeEl = this.viewport.createDiv({ cls: "pdfaw-marquee", attr: { hidden: "true" } });
     this.filterBar = this.viewport.createDiv({ cls: "pdfaw-filters", attr: { "aria-label": "Filter comments by category" } });
     this.renderFilters();
     this.selectionBar = this.root.createDiv({ cls: "pdfaw-selection-toolbar", attr: { role: "toolbar", "aria-label": "Comment on selection" } });
@@ -23207,7 +23238,15 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       }
     }, { capture: true });
     this.registerDomEvent(this.viewport, "pointerdown", (event) => this.startPan(event));
-    this.registerDomEvent(this.pageEl, "pointerdown", (event) => {
+    this.registerDomEvent(this.stage, "pointerdown", (event) => {
+      const page = event.target.closest(".pdfaw-page");
+      if (!page) return;
+      this.activatePage(Number(page.dataset.page));
+      if (this.mode === "canvas" && (event.shiftKey || this.multiSelect) && event.button === 0) {
+        this.selectNode(pageKey(this.currentPage), true);
+        event.preventDefault();
+        return;
+      }
       if (event.button === 0 && this.tool === "select" && this.pageReady) this.selectionPointer = event.pointerId;
       this.commentPress = this.mode === "reading" && event.button === 0 ? { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, dragged: false } : null;
     });
@@ -23217,7 +23256,9 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       if (press?.pointer === event.pointerId && Math.hypot(event.clientX - press.start.x, event.clientY - press.start.y) > 4) press.dragged = true;
       this.moveSelectionBarDrag(event);
     });
-    this.registerDomEvent(this.pageEl, "click", (event) => this.openCommentAt(event));
+    this.registerDomEvent(this.stage, "click", (event) => {
+      if (event.target.closest(".pdfaw-page")) this.openCommentAt(event);
+    });
     this.registerDomEvent(this.contentEl.ownerDocument, "pointerdown", (event) => {
       if (!this.commentPreview.contains(event.target)) this.commentPreview.hide();
     });
@@ -23243,7 +23284,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       this.positionSelectionBar();
       this.commentPreview.hide();
     });
-    this.registerDomEvent(this.pageEl, "keyup", () => this.captureSelection());
+    this.registerDomEvent(this.stage, "keyup", () => this.captureSelection());
     this.registerDomEvent(this.contentEl.ownerDocument, "selectionchange", () => {
       this.captureSelection();
     });
@@ -23274,18 +23315,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
         this.applyCamera();
       }
     }, { passive: false });
-    this.registerDomEvent(this.pageEl, "contextmenu", (event) => {
-      if (this.pinchActive) {
-        event.preventDefault();
-        return;
-      }
-      this.captureSelection();
-      if (!this.selection) return;
-      event.preventDefault();
-      const menu = new import_obsidian8.Menu();
-      for (const category of this.categories.active()) menu.addItem((item) => item.setTitle(category.label).setIcon(category.icon).onClick(() => this.editSelection(category.id)));
-      menu.showAtMouseEvent(event);
-    });
+    this.registerDomEvent(this.viewport, "contextmenu", (event) => this.contextMenu(event));
     this.registerDomEvent(this.root, "keydown", (event) => this.onKey(event));
     this.registerDomEvent(this.contentEl.ownerDocument, "keydown", (event) => {
       if (event.key === "Escape") this.commentPreview.hide();
@@ -23299,6 +23329,253 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     });
     this.resizeObserver.observe(this.viewport);
     this.register(() => this.resizeObserver?.disconnect());
+  }
+  get layout() {
+    var _a;
+    return (_a = this.sidecar).canvasLayout ?? (_a.canvasLayout = emptyLayout());
+  }
+  cardHeights() {
+    return new Map([...this.cards].filter(([, el]) => el.offsetHeight > 0).map(([id, el]) => [id, el.offsetHeight]));
+  }
+  ensureBoard() {
+    if (this.sidecar && this.pages.surfaces.size) ensureLayout(this.layout, this.pages.sizes, this.sidecar.annotations, this.cardHeights());
+  }
+  installPage(surface) {
+    surface.header.onpointerdown = (event) => this.startNodeDrag(event, pageKey(surface.number), surface.header);
+    surface.header.onfocus = () => {
+      this.activatePage(surface.number);
+      this.selectNode(pageKey(surface.number), false, true);
+    };
+    surface.header.ondblclick = () => {
+      this.activatePage(surface.number);
+      this.setMode("reading");
+    };
+  }
+  nodeBounds() {
+    const boxes = /* @__PURE__ */ new Map();
+    if (!this.sidecar) return boxes;
+    for (const surface of this.pages.surfaces.values()) {
+      const pos = this.layout.pages[surface.number];
+      if (pos) boxes.set(pageKey(surface.number), { ...pos, width: surface.width, height: surface.height });
+    }
+    for (const annotation of this.sidecar.annotations) boxes.set(cardKey(annotation.id), { ...this.position(annotation), width: CARD_WIDTH, height: this.cards.get(annotation.id)?.offsetHeight || estimatedHeight(annotation) });
+    return boxes;
+  }
+  applyLayout() {
+    if (!this.sidecar) return;
+    for (const surface of this.pages.surfaces.values()) {
+      const pos = this.mode === "canvas" ? this.layout.pages[surface.number] : { x: 0, y: 0 };
+      if (pos) {
+        surface.shell.style.left = `${pos.x}px`;
+        surface.shell.style.top = `${pos.y}px`;
+      }
+      surface.shell.hidden = this.mode === "reading" && surface.number !== this.currentPage;
+    }
+    for (const [id, el] of this.cards) {
+      const pos = this.layout.cards[id];
+      if (pos) {
+        el.style.left = `${pos.x}px`;
+        el.style.top = `${pos.y}px`;
+      }
+    }
+    this.renderGroups();
+    this.queueGeometry();
+    this.queuePageRaster();
+  }
+  renderGroups() {
+    if (!this.sidecar) return;
+    const boxes = this.nodeBounds(), ids = new Set(this.layout.groups.map((g) => g.id));
+    for (const [id, el] of this.groupElements) if (!ids.has(id)) {
+      el.remove();
+      this.groupElements.delete(id);
+    }
+    for (const group of this.layout.groups) {
+      let el = this.groupElements.get(group.id);
+      if (!el) {
+        el = this.groupsEl.createDiv({ cls: "pdfaw-group", attr: { "data-node": `g:${group.id}` } });
+        const header = el.createDiv({ cls: "pdfaw-group-handle", attr: { tabindex: "0" } });
+        header.onpointerdown = (event) => this.startNodeDrag(event, `g:${group.id}`, header);
+        header.ondblclick = () => this.renameGroup(group.id);
+        this.groupElements.set(group.id, el);
+      }
+      el.firstElementChild.textContent = group.name;
+      const members = group.members.flatMap((key) => boxes.has(key) ? [boxes.get(key)] : []);
+      el.hidden = !members.length;
+      const box = enclosingBounds(members, 45);
+      box.y -= 32;
+      box.height += 32;
+      Object.assign(el.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` });
+    }
+  }
+  toWorld(x, y) {
+    const rect = this.viewport.getBoundingClientRect();
+    return { x: (x - rect.left - this.camera.x) / this.camera.zoom, y: (y - rect.top - this.camera.y) / this.camera.zoom };
+  }
+  setNodePosition(key, pos) {
+    if (key.startsWith("p:")) this.layout.pages[key.slice(2)] = pos;
+    else this.layout.cards[key.slice(2)] = pos;
+  }
+  expandedSelection() {
+    const keys = /* @__PURE__ */ new Set();
+    for (const key of this.selectedNodes) {
+      if (key.startsWith("g:")) this.layout.groups.find((g) => g.id === key.slice(2))?.members.forEach((member) => keys.add(member));
+      else keys.add(key);
+    }
+    const boxes = this.nodeBounds();
+    return new Set([...keys].filter((key) => boxes.has(key)));
+  }
+  selectNode(key, additive = false, preserve = false) {
+    if (additive) {
+      if (this.selectedNodes.has(key)) this.selectedNodes.delete(key);
+      else this.selectedNodes.add(key);
+    } else if (!preserve || !this.expandedSelection().has(key) && !this.selectedNodes.has(key)) this.selectedNodes = /* @__PURE__ */ new Set([key]);
+    this.updateSelectionPaint();
+  }
+  updateSelectionPaint() {
+    if (!this.sidecar) return;
+    const selected = this.expandedSelection();
+    for (const el of Array.from(this.stage.querySelectorAll("[data-node]"))) el.toggleClass("is-selected", selected.has(el.dataset.node) || this.selectedNodes.has(el.dataset.node));
+    this.multiSelectButton.setAttribute("aria-pressed", String(this.multiSelect));
+    this.multiSelectButton.toggleClass("is-active", this.multiSelect);
+    this.undoButton.disabled = !this.history.canUndo;
+    this.redoButton.disabled = !this.history.canRedo;
+    this.snapButton.setAttribute("aria-pressed", String(this.layout.snap));
+    this.snapButton.toggleClass("is-active", this.layout.snap);
+  }
+  startNodeDrag(event, key, element) {
+    if (event.button !== 0 || this.mode !== "canvas" || this.tool !== "select" || this.pinchActive) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectNode(key, event.shiftKey || this.multiSelect, true);
+    if (event.shiftKey || this.multiSelect) {
+      this.root.focus();
+      return;
+    }
+    element.focus();
+    this.clearSelection();
+    this.win.getSelection()?.removeAllRanges();
+    const boxes = this.nodeBounds(), nodes = /* @__PURE__ */ new Map();
+    for (const member of this.expandedSelection()) {
+      const box = boxes.get(member);
+      nodes.set(member, { x: box.x, y: box.y });
+    }
+    this.gesture = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { x: 0, y: 0 }, element, nodes, before: structuredClone(this.layout) };
+    element.setPointerCapture(event.pointerId);
+  }
+  focusPage(number) {
+    const surface = this.pages.surfaces.get(number), pos = this.layout.pages[number];
+    if (!surface || !pos) return;
+    this.camera = fitCamera({ ...pos, width: surface.width, height: surface.height }, this.viewport.clientWidth, Math.max(100, this.viewport.clientHeight - 100));
+    this.camera.y += 65;
+    this.applyCamera();
+  }
+  commitLayout(before) {
+    if (this.history.commit(before, this.layout)) {
+      this.applyLayout();
+      this.updateSelectionPaint();
+      void this.save();
+    }
+  }
+  restoreLayout(redo) {
+    if (!this.sidecar) return;
+    this.stopGesture();
+    const restored = redo ? this.history.redo(this.layout) : this.history.undo(this.layout);
+    if (!restored) return;
+    this.sidecar.canvasLayout = restored;
+    this.ensureBoard();
+    this.selectedNodes.clear();
+    this.applyLayout();
+    this.updateSelectionPaint();
+    void this.save();
+  }
+  toggleSnap() {
+    if (!this.sidecar) return;
+    const before = structuredClone(this.layout);
+    this.layout.snap = !this.layout.snap;
+    this.commitLayout(before);
+  }
+  groupSelection() {
+    if (!this.sidecar) return;
+    const members = [...this.expandedSelection()], data = this.sidecar;
+    if (members.length < 2) {
+      new import_obsidian7.Notice("Select at least two pages or comments to group.");
+      return;
+    }
+    new GroupNameModal(this.app, "", this.categories.themeColors(), (name) => {
+      if (this.sidecar !== data) return;
+      const before = structuredClone(this.layout), valid = new Set(this.nodeBounds().keys()), kept = members.filter((key) => valid.has(key));
+      if (kept.length < 2) return;
+      this.layout.groups = this.layout.groups.map((g) => ({ ...g, members: g.members.filter((key) => !kept.includes(key)) })).filter((g) => g.members.length);
+      const id = crypto.randomUUID();
+      this.multiSelect = false;
+      this.layout.groups.push({ id, name, members: kept });
+      this.selectedNodes = /* @__PURE__ */ new Set([`g:${id}`]);
+      this.commitLayout(before);
+    }).open();
+  }
+  renameGroup(id) {
+    const group = this.layout.groups.find((g) => g.id === id), data = this.sidecar;
+    if (!group) return;
+    new GroupNameModal(this.app, group.name, this.categories.themeColors(), (name) => {
+      if (this.sidecar !== data) return;
+      const target = this.layout.groups.find((g) => g.id === id);
+      if (!target) return;
+      const before = structuredClone(this.layout);
+      target.name = name;
+      this.commitLayout(before);
+    }).open();
+  }
+  ungroupSelection() {
+    const before = structuredClone(this.layout), members = this.expandedSelection();
+    this.layout.groups = this.layout.groups.filter((g) => !this.selectedNodes.has(`g:${g.id}`) && !g.members.every((key) => members.has(key)));
+    this.selectedNodes = members;
+    this.commitLayout(before);
+  }
+  addLayoutMenu(menu) {
+    if (this.mode !== "canvas") return;
+    menu.addSeparator();
+    const group = this.selectedNodes.size === 1 ? this.layout.groups.find((g) => this.selectedNodes.has(`g:${g.id}`)) : void 0;
+    if (group) menu.addItem((item) => item.setTitle("Rename group").setIcon("pencil").onClick(() => this.renameGroup(group.id)));
+    menu.addItem((item) => item.setTitle("Group selection").setIcon("group").setDisabled(this.expandedSelection().size < 2).onClick(() => this.groupSelection()));
+    menu.addItem((item) => item.setTitle("Ungroup selection").setIcon("ungroup").setDisabled(!this.layout.groups.some((g) => this.selectedNodes.has(`g:${g.id}`) || g.members.every((key) => this.expandedSelection().has(key)))).onClick(() => this.ungroupSelection()));
+    menu.addItem((item) => item.setTitle("Undo canvas change").setIcon("undo-2").setDisabled(!this.history.canUndo).onClick(() => this.restoreLayout(false)));
+    menu.addItem((item) => item.setTitle("Redo canvas change").setIcon("redo-2").setDisabled(!this.history.canRedo).onClick(() => this.restoreLayout(true)));
+    menu.addItem((item) => item.setTitle("Snap to grid and objects").setIcon("magnet").setChecked(this.layout.snap).onClick(() => this.toggleSnap()));
+    menu.addItem((item) => item.setTitle("Select all pages and comments").onClick(() => {
+      this.selectedNodes = new Set(this.nodeBounds().keys());
+      this.updateSelectionPaint();
+    }));
+    menu.addItem((item) => item.setTitle("Fit PDF and comments").setIcon("scan").onClick(() => this.fit()));
+    menu.addItem((item) => item.setTitle("Rearrange pages and comments").setIcon("layout-dashboard").onClick(() => this.rearrangeCards()));
+  }
+  contextMenu(event) {
+    if (!this.sidecar) return;
+    event.preventDefault();
+    const target = event.target;
+    const key = target.closest("[data-node]")?.dataset.node;
+    if (key?.startsWith("a:")) {
+      const annotation = this.sidecar.annotations.find((a) => cardKey(a.id) === key);
+      if (annotation) this.cardMenu(annotation, target);
+      return;
+    }
+    if (key && this.mode === "canvas") this.selectNode(key, false, true);
+    const menu = new import_obsidian7.Menu();
+    if (key?.startsWith("p:")) {
+      const number = Number(key.slice(2));
+      this.activatePage(number);
+      this.captureSelection();
+      if (this.selection) for (const category of this.categories.active()) menu.addItem((item) => item.setTitle(`Comment: ${category.label}`).setIcon(category.icon).onClick(() => this.editSelection(category.id)));
+      menu.addItem((item) => item.setTitle("Read page").setIcon("book-open").onClick(() => {
+        this.setMode("reading");
+        void this.showPage(number);
+      }));
+      menu.addItem((item) => item.setTitle("Read page comments").setIcon("messages-square").onClick(() => {
+        this.updateSidebar();
+        void this.sidebars.show(COMMENTS_VIEW);
+      }));
+    }
+    this.addLayoutMenu(menu);
+    menu.showAtPosition({ x: event.clientX, y: event.clientY });
   }
   menuPosition(el) {
     const box = el.getBoundingClientRect();
@@ -23333,24 +23610,9 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       else this.editAnnotation(annotation);
     }
   }
-  async openNativeCanvas() {
+  async openCanvas() {
     await this.fileReady;
-    if (!this.pdf || !this.file || !this.sidecar) return;
-    const pdf = this.pdf, file = this.file, data = this.sidecar;
-    try {
-      await this.flushNotes();
-      const pages = [];
-      for (let n = 1; n <= pdf.numPages; n++) {
-        const page = await pdf.getPage(n);
-        if (pdf !== this.pdf) return;
-        const viewport = page.getViewport({ scale: PDF_SCALE });
-        pages.push({ width: viewport.width, height: viewport.height });
-      }
-      await this.nativeCanvas.open(file, data, pages);
-    } catch (error) {
-      new import_obsidian8.Notice("Could not open the PDF canvas.");
-      console.error("Remark My Words: canvas", error);
-    }
+    this.setMode("canvas");
   }
   async onLoadFile(file) {
     this.fileReady = this.loadPdf(file);
@@ -23365,7 +23627,8 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.sidecar = null;
     this.noteInput.disabled = true;
     this.noteInput.value = "";
-    this.pageEl.empty();
+    this.pageEl.remove();
+    this.pageEl = this.stage.createDiv({ cls: "pdfaw-page" });
     this.cardsEl.empty();
     this.links.replaceChildren();
     this.thumbnails.empty();
@@ -23376,7 +23639,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       if (generation !== this.generation) return;
       const path = `${file.path}.obsidian-annot.json`;
       const existing = this.app.vault.getAbstractFileByPath(path);
-      const data = existing instanceof import_obsidian8.TFile ? readSidecar(await this.app.vault.read(existing), file.path) : { version: 2, pdfPath: file.path, annotations: [], notes: "" };
+      const data = existing instanceof import_obsidian7.TFile ? readSidecar(await this.app.vault.read(existing), file.path) : { version: 2, pdfPath: file.path, annotations: [], notes: "" };
       const buffer = await this.app.vault.readBinary(file);
       if (generation !== this.generation) return;
       this.workerUrl ?? (this.workerUrl = URL.createObjectURL(new Blob([pdf_worker_min_default], { type: "text/javascript" })));
@@ -23396,13 +23659,17 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       this.pageTotal.setText(String(pdf.numPages));
       this.pageInput.max = String(pdf.numPages);
       this.buildThumbnails();
+      this.pageEl.remove();
+      await this.pages.prepare(pdf);
+      if (generation !== this.generation) return;
+      this.ensureBoard();
       await this.showPage(1);
     } catch (error) {
       if (generation !== this.generation) return;
       this.pageEl.empty();
       this.pageEl.createDiv({ cls: "pdfaw-loading pdfaw-error", text: `Could not open PDF. ${error instanceof Error ? error.message : String(error)}` });
       this.saveStatus.setText("Failed to load");
-      new import_obsidian8.Notice("Remark My Words: Failed to load. Existing annotation files have not been changed.");
+      new import_obsidian7.Notice("Remark My Words: Failed to load. Existing annotation files have not been changed.");
       console.error("Remark My Words", error);
     }
   }
@@ -23429,13 +23696,16 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.pageChangePending = false;
     this.generation++;
     this.pageGeneration++;
-    this.resetPageRaster();
+    this.pages?.clear();
+    this.history.clear();
+    this.selectedNodes.clear();
+    this.multiSelect = false;
+    this.canvasCamera = null;
+    this.groupElements.clear();
+    this.groupsEl?.empty();
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
     this.renderTasks.clear();
-    this.pageTask = null;
-    this.textLayer?.cancel();
-    this.textLayer = null;
     if (this.loading) void this.loading.destroy().catch(() => {
     });
     this.loading = null;
@@ -23463,17 +23733,17 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.saveStatus.setText("Saving \u2026");
     this.saveQueue = this.saveQueue.then(async () => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian8.TFile) await this.app.vault.modify(file, data);
+      if (file instanceof import_obsidian7.TFile) await this.app.vault.modify(file, data);
       else await this.app.vault.create(path, data);
       if (generation === this.generation && revision === this.saveRevision) this.saveStatus.setText("Saved to vault");
     }).catch((error) => {
       if (generation === this.generation) this.saveStatus.setText("Failed to save");
-      new import_obsidian8.Notice("Could not save comments. Check write permissions for the vault.");
+      new import_obsidian7.Notice("Could not save comments. Check write permissions for the vault.");
       console.error("Remark My Words: save", error);
     });
     return this.saveQueue;
   }
-  async renderCanvas(page, canvas, scale, density, main = false) {
+  async renderCanvas(page, canvas, scale, density) {
     const viewport = page.getViewport({ scale });
     canvas.width = Math.ceil(viewport.width * density);
     canvas.height = Math.ceil(viewport.height * density);
@@ -23481,121 +23751,52 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas unavailable.");
     const task = page.render({ canvasContext: context, viewport, transform: [canvas.width / viewport.width, 0, 0, canvas.height / viewport.height, 0, 0] });
-    if (main) this.pageTask = task;
     this.renderTasks.add(task);
     try {
       await task.promise;
     } finally {
       this.renderTasks.delete(task);
-      if (this.pageTask === task) this.pageTask = null;
     }
-  }
-  resetPageRaster() {
-    this.win.clearTimeout(this.rasterTimer);
-    this.rasterTimer = void 0;
-    this.rasterRevision++;
-    this.pageTask?.cancel();
-    this.rasterPage = null;
-    this.pageCanvas = null;
-    this.rasterDensity = 0;
-    this.requestedDensity = 0;
-  }
-  pageDensity() {
-    return Math.min(
-      this.camera.zoom * (this.win.devicePixelRatio || 1),
-      Math.sqrt(16777216 / (this.pageWidth * this.pageHeight)),
-      8192 / Math.max(this.pageWidth, this.pageHeight)
-    );
   }
   queuePageRaster() {
-    if (!this.pageReady || !this.rasterPage || !this.pageCanvas) return;
-    const density = this.pageDensity();
-    if (density === this.requestedDensity) return;
-    this.requestedDensity = density;
-    const revision = ++this.rasterRevision;
-    this.win.clearTimeout(this.rasterTimer);
-    this.rasterTimer = void 0;
-    this.pageTask?.cancel();
-    if (density === this.rasterDensity) return;
-    this.rasterTimer = this.win.setTimeout(() => {
-      this.rasterTimer = void 0;
-      void this.refreshPageRaster(density, revision);
-    }, 120);
+    if (this.pages?.surfaces.size) this.pages.update(this.mode, this.currentPage, this.camera.zoom, this.viewport);
   }
-  async refreshPageRaster(density, revision) {
-    const page = this.rasterPage, previous = this.pageCanvas;
-    if (!page || !previous || !this.pageReady || revision !== this.rasterRevision) return;
-    const canvas = this.win.createEl("canvas");
-    canvas.setAttribute("aria-label", `PDF page ${this.currentPage}`);
-    try {
-      await this.renderCanvas(page, canvas, PDF_SCALE, density, true);
-      if (revision !== this.rasterRevision || previous !== this.pageCanvas) return;
-      previous.replaceWith(canvas);
-      this.pageCanvas = canvas;
-      this.rasterDensity = density;
-    } catch (error) {
-      if (revision !== this.rasterRevision || error instanceof __webpack_exports__RenderingCancelledException) return;
-      this.requestedDensity = this.rasterDensity;
-      console.error("Remark My Words: resolution", error);
-    }
-  }
-  async showPage(pageNumber, edge = "top") {
-    if (!this.pdf || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
-    this.resetPinch();
-    this.resetPageRaster();
+  activatePage(pageNumber) {
+    const surface = this.pages.surfaces.get(pageNumber);
+    if (!surface) return;
     this.currentPage = pageNumber;
-    this.pageReady = false;
-    this.viewport.scrollTop = 0;
-    this.viewport.scrollLeft = 0;
-    const token = ++this.pageGeneration, generation = this.generation;
-    this.pageTask?.cancel();
-    this.textLayer?.cancel();
-    this.clearSelection();
+    this.pageEl = surface.body;
+    this.pageWidth = surface.width;
+    this.pageHeight = surface.height;
+    this.pageReady = !!surface.canvas && !!surface.textLayer;
     this.pageInput.value = String(pageNumber);
     this.thumbButtons.forEach((button, page) => {
       button.toggleClass("is-active", page === pageNumber);
       button.setAttribute("aria-current", page === pageNumber ? "page" : "false");
     });
-    this.thumbButtons.get(pageNumber)?.scrollIntoView({ block: "nearest" });
-    this.pageEl.empty();
-    this.cardsEl.empty();
-    this.links.replaceChildren();
+    this.updateSidebar();
+  }
+  async showPage(pageNumber, edge = "top") {
+    if (!this.pdf || !Number.isInteger(pageNumber) || !this.pages.surfaces.has(pageNumber)) return;
+    this.resetPinch();
+    this.stopGesture();
+    this.clearSelection();
+    this.win.getSelection()?.removeAllRanges();
     this.commentPreview.hide();
-    this.pageEl.createDiv({ cls: "pdfaw-loading", text: "Loading page \u2026" });
-    try {
-      const page = await this.pdf.getPage(pageNumber);
-      if (token !== this.pageGeneration || generation !== this.generation) return;
-      const viewport = page.getViewport({ scale: PDF_SCALE });
-      this.pageWidth = viewport.width;
-      this.pageHeight = viewport.height;
-      this.pageEl.empty();
-      this.pageEl.style.width = `${this.pageWidth}px`;
-      this.pageEl.style.height = `${this.pageHeight}px`;
-      this.pageEl.style.setProperty("--scale-factor", String(PDF_SCALE));
-      this.pageEl.dataset.page = String(pageNumber);
-      const canvas = this.pageEl.createEl("canvas", { attr: { "aria-label": `PDF page ${pageNumber}` } });
-      this.renderAnnotations();
+    this.activatePage(pageNumber);
+    const token = ++this.pageGeneration;
+    this.thumbButtons.get(pageNumber)?.scrollIntoView({ block: "nearest" });
+    this.renderFilters();
+    this.renderAnnotations();
+    if (this.mode === "canvas") this.focusPage(pageNumber);
+    else {
+      this.applyLayout();
       this.fit();
-      this.rasterPage = page;
-      this.pageCanvas = canvas;
-      this.rasterDensity = this.requestedDensity = this.pageDensity();
-      await this.renderCanvas(page, canvas, PDF_SCALE, this.rasterDensity, true);
-      if (token !== this.pageGeneration || generation !== this.generation) return;
-      const layer = this.pageEl.createDiv({ cls: "pdfaw-textlayer" });
-      const content = await page.getTextContent();
-      if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.textLayer = new __webpack_exports__TextLayer({ textContentSource: content, container: layer, viewport });
-      await this.textLayer.render();
-      if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.renderAnnotations();
-      if (this.mode === "reading") this.viewport.scrollTop = edge === "bottom" ? this.viewport.scrollHeight : 0;
-      this.pageReady = true;
-      this.queuePageRaster();
-    } catch (error) {
-      if (token !== this.pageGeneration || generation !== this.generation) return;
-      this.pageEl.createDiv({ cls: "pdfaw-loading pdfaw-error", text: "Could not render this page." });
-      console.error("Remark My Words: page", error);
     }
+    await this.pages.ensure(pageNumber);
+    if (token !== this.pageGeneration) return;
+    this.pageReady = !!this.pageCanvas;
+    if (this.mode === "reading") this.viewport.scrollTop = edge === "bottom" ? this.viewport.scrollHeight : 0;
   }
   buildThumbnails() {
     this.thumbnails.empty();
@@ -23631,10 +23832,10 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     return (this.sidecar?.annotations ?? []).filter((annotation) => annotation.page === this.currentPage);
   }
   visibleAnnotations() {
-    return this.pageAnnotations().filter((annotation) => this.mode === "reading" || !this.filter || annotation.category === this.filter);
+    return (this.mode === "canvas" ? this.sidecar?.annotations ?? [] : this.pageAnnotations()).filter((annotation) => this.mode === "reading" || !this.filter || annotation.category === this.filter);
   }
   position(annotation) {
-    return annotation.position ?? defaultPosition(this.pageAnnotations().indexOf(annotation), this.pageWidth);
+    return this.sidecar?.canvasLayout?.cards[annotation.id] ?? annotation.position ?? defaultPosition(this.pageAnnotations().indexOf(annotation), this.pageWidth);
   }
   renderCategoryTools() {
     this.selectionBar.empty();
@@ -23663,7 +23864,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       this.renderAnnotations();
     };
     const choices = this.categories.active();
-    for (const annotation of this.pageAnnotations()) {
+    for (const annotation of this.sidecar?.annotations ?? []) {
       if (!choices.some((item) => item.id === annotation.category)) choices.push({ id: annotation.category, ...this.categories.forAnnotation(annotation) });
     }
     for (const category of choices) {
@@ -23683,21 +23884,23 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.sidecar?.annotations.forEach((annotation) => {
       annotation.categoryStyle = this.categories.forAnnotation(annotation);
     });
-    this.pageAnnotations().forEach((annotation, index) => {
-      annotation.position ?? (annotation.position = defaultPosition(index, this.pageWidth));
-    });
-    this.pageEl.querySelector(".pdfaw-highlights")?.remove();
-    const overlay = this.pageEl.createDiv({ cls: "pdfaw-highlights" });
+    this.ensureBoard();
+    const overlays = /* @__PURE__ */ new Map();
+    for (const surface of this.pages.surfaces.values()) {
+      surface.body.querySelector(".pdfaw-highlights")?.remove();
+      overlays.set(surface.number, surface.body.createDiv({ cls: "pdfaw-highlights" }));
+    }
     this.cards.forEach((card) => this.resizeObserver?.unobserve(card));
     this.cards.clear();
     this.cardsEl.empty();
     for (const annotation of this.visibleAnnotations()) {
       const category = this.categories.forAnnotation(annotation);
       for (const quad2 of annotation.quads) {
-        const highlight = overlay.createDiv({ cls: `pdfaw-highlight${this.activeId === annotation.id ? " is-active" : ""}` });
+        const highlight = overlays.get(annotation.page)?.createDiv({ cls: `pdfaw-highlight${this.activeId === annotation.id ? " is-active" : ""}` });
+        if (!highlight) continue;
         Object.assign(highlight.style, { left: `${quad2.x}px`, top: `${quad2.y}px`, width: `${quad2.w}px`, height: `${quad2.h}px`, backgroundColor: category.hex });
       }
-      const card = this.cardsEl.createDiv({ cls: "pdfaw-comment-card", attr: { tabindex: "0", "aria-label": `${category.label}: ${annotation.title || annotation.text}`, "data-id": annotation.id } });
+      const card = this.cardsEl.createDiv({ cls: "pdfaw-comment-card", attr: { tabindex: "0", "aria-label": `${category.label}: ${annotation.title || annotation.text}`, "data-id": annotation.id, "data-node": cardKey(annotation.id) } });
       card.style.setProperty("--category", category.hex);
       const position = this.position(annotation);
       card.style.left = `${position.x}px`;
@@ -23705,18 +23908,17 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       card.toggleClass("is-active", this.activeId === annotation.id);
       const header = card.createDiv({ cls: "pdfaw-card-header" });
       const badge = header.createDiv({ cls: "pdfaw-badge" });
-      (0, import_obsidian8.setIcon)(badge.createSpan(), category.icon);
+      (0, import_obsidian7.setIcon)(badge.createSpan(), category.icon);
       badge.createSpan({ text: category.label });
       this.button(header, "ellipsis", "Comment actions", () => this.cardMenu(annotation, header));
       header.onpointerdown = (event) => {
-        if (event.button !== 0 || event.target.closest("button")) return;
-        event.preventDefault();
-        event.stopPropagation();
-        card.focus();
-        this.activeId = annotation.id;
-        this.gesture = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { ...this.position(annotation) }, card: annotation, element: header };
-        header.setPointerCapture(event.pointerId);
-        card.addClass("is-dragging");
+        if (!event.target.closest("button")) this.startNodeDrag(event, cardKey(annotation.id), header);
+      };
+      card.onpointerdown = (event) => {
+        if (event.button === 0 && !event.target.closest("button, .pdfaw-card-header")) {
+          this.selectNode(cardKey(annotation.id), event.shiftKey || this.multiSelect);
+          if (event.shiftKey || this.multiSelect) event.preventDefault();
+        }
       };
       card.createEl("h3", { text: annotation.title || (annotation.comment ? "Comment" : "Highlighted passage") });
       const body = card.createDiv({ cls: "pdfaw-comment-body" });
@@ -23730,6 +23932,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       const jump = footer.createEl("button", { text: `\u2197 p. ${annotation.page}`, attr: { "aria-label": "Go to highlighted passage" } });
       jump.onclick = () => this.focusAnnotation(annotation);
       footer.createEl("time", { text: new Date(annotation.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short" }), attr: { datetime: new Date(annotation.updatedAt).toISOString() } });
+      card.onfocus = () => this.selectNode(cardKey(annotation.id), false, true);
       card.ondblclick = (event) => {
         if (!event.target.closest("button")) this.editAnnotation(annotation);
       };
@@ -23739,40 +23942,26 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
           event.preventDefault();
           this.editAnnotation(annotation);
         }
-        const delta = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } };
-        if (delta[event.key]) {
-          event.preventDefault();
-          event.stopPropagation();
-          const old = this.position(annotation), step = event.shiftKey ? 40 : 10;
-          annotation.position = { x: old.x + delta[event.key].x * step, y: old.y + delta[event.key].y * step };
-          card.style.left = `${annotation.position.x}px`;
-          card.style.top = `${annotation.position.y}px`;
-          this.queueGeometry();
-          void this.save();
-        }
       };
       this.cards.set(annotation.id, card);
       this.resizeObserver?.observe(card);
     }
     this.status.setText(`${this.file?.name ?? "PDF"}  /  Page ${this.currentPage}  \xB7  ${this.visibleAnnotations().length} of ${this.sidecar?.annotations.length ?? 0} annotations`);
-    this.queueGeometry();
+    this.applyLayout();
+    this.updateSelectionPaint();
     if (this.sidebars.context?.owner === this || this.app.workspace.getActiveViewOfType(_PdfAnnotatorView) === this) this.updateSidebar();
   }
   rearrangeCards() {
-    let leftY = 28, rightY = 28;
-    this.pageAnnotations().forEach((annotation, index) => {
-      const card = this.cards.get(annotation.id), height = card?.offsetHeight || 220;
-      const left = index % 2 === 0;
-      annotation.position = { x: left ? -CARD_WIDTH - 90 : this.pageWidth + 90, y: left ? leftY : rightY };
-      if (left) leftY += height + 24;
-      else rightY += height + 24;
-    });
-    this.renderAnnotations();
+    if (!this.sidecar) return;
+    this.stopGesture();
+    const before = structuredClone(this.layout);
+    arrangeLayout(this.layout, this.pages.sizes, this.sidecar.annotations, this.cardHeights());
+    this.commitLayout(before);
     this.fit();
-    void this.save();
   }
   cardMenu(annotation, element) {
-    const menu = new import_obsidian8.Menu();
+    this.selectNode(cardKey(annotation.id), false, true);
+    const menu = new import_obsidian7.Menu();
     menu.addItem((item) => item.setTitle("Edit").setIcon("pencil").onClick(() => this.editAnnotation(annotation)));
     menu.addItem((item) => item.setTitle("Go to passage").setIcon("locate").onClick(() => this.focusAnnotation(annotation)));
     menu.addSeparator();
@@ -23786,6 +23975,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     }));
     menu.addSeparator();
     menu.addItem((item) => item.setTitle("Delete comment").setIcon("trash-2").onClick(() => this.deleteAnnotation(annotation)));
+    this.addLayoutMenu(menu);
     menu.showAtPosition(this.menuPosition(element));
   }
   deleteAnnotation(annotation) {
@@ -23813,7 +24003,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
   }
   editSelection(category) {
     if (!this.selection || !this.sidecar) {
-      new import_obsidian8.Notice("Select a passage in the PDF first.");
+      new import_obsidian7.Notice("Select a passage in the PDF first.");
       return;
     }
     const selection = this.selection, data = this.sidecar;
@@ -23830,7 +24020,6 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       this.clearSelection();
       this.win.getSelection()?.removeAllRanges();
       this.renderAnnotations();
-      if (this.mode === "canvas") this.fit();
       void this.save();
     }, this.categories.active(), this.categories.themeColors()).open();
   }
@@ -23848,14 +24037,21 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.commentPreview.show(matches, { left: box.left + quad2.x * zoom, top: box.top + quad2.y * zoom, bottom: box.top + (quad2.y + quad2.h) * zoom }, this.root);
   }
   captureSelection() {
-    if (this.pinchActive || this.tool !== "select" || !this.pageReady) return;
+    if (this.pinchActive || this.tool !== "select" || this.gesture?.nodes || this.gesture?.marquee) return;
     const selection = this.win.getSelection();
     if (!selection?.rangeCount || selection.isCollapsed || !selection.toString().trim()) {
       this.clearSelection();
       return;
     }
     const range = selection.getRangeAt(0);
-    const layer = this.pageEl.querySelector(".pdfaw-textlayer");
+    const start = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+    const layer = start?.closest(".pdfaw-textlayer");
+    const page = layer?.closest(".pdfaw-page");
+    if (!page || !this.stage.contains(page)) {
+      this.clearSelection();
+      return;
+    }
+    this.activatePage(Number(page.dataset.page));
     if (!layer || !layer.contains(range.startContainer) || !layer.contains(range.endContainer)) {
       this.clearSelection();
       return;
@@ -23878,7 +24074,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.selectionBarPosition = null;
     this.selectionDrag = null;
     if (this.selectionBar) this.selectionBar.hidden = true;
-    this.pageEl?.querySelector(".pdfaw-selection")?.remove();
+    this.stage?.querySelectorAll(".pdfaw-selection").forEach((el) => el.remove());
   }
   positionSelectionBar() {
     if (!this.selection) return;
@@ -23887,7 +24083,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       return;
     }
     const q = this.selection.quads[this.selection.quads.length - 1];
-    const page = this.pageEl.getBoundingClientRect(), viewport = this.viewport.getBoundingClientRect(), root = this.root.getBoundingClientRect();
+    const page = (this.pages.surfaces.get(this.selection.page)?.body ?? this.pageEl).getBoundingClientRect(), viewport = this.viewport.getBoundingClientRect(), root = this.root.getBoundingClientRect();
     const bottom = page.top + (q.y + q.h) * this.camera.zoom, top = page.top + q.y * this.camera.zoom;
     this.selectionBar.hidden = bottom < viewport.top || top > viewport.bottom;
     if (this.selectionBar.hidden) return;
@@ -23925,10 +24121,19 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.selectionDrag = null;
   }
   focusAnnotation(annotation) {
+    this.activatePage(annotation.page);
     const q = annotation.quads[0];
     this.activeId = annotation.id;
-    this.camera.x = this.viewport.clientWidth / 2 - (q.x + q.w / 2) * this.camera.zoom;
-    this.camera.y = this.viewport.clientHeight / 2 - q.y * this.camera.zoom;
+    if (this.mode === "reading") {
+      void this.showPage(annotation.page).then(() => {
+        this.viewport.scrollTop = q.y * this.camera.zoom;
+      });
+      return;
+    }
+    const origin = this.layout.pages[annotation.page];
+    if (!origin) return;
+    this.camera.x = this.viewport.clientWidth / 2 - (origin.x + q.x + q.w / 2) * this.camera.zoom;
+    this.camera.y = this.viewport.clientHeight / 2 - (origin.y + q.y) * this.camera.zoom;
     this.renderAnnotations();
     this.applyCamera();
   }
@@ -23941,41 +24146,66 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       button.setAttribute("aria-pressed", String(key === tool));
     });
     if (tool === "hand") {
+      this.multiSelect = false;
+      this.updateSelectionPaint();
       this.clearSelection();
       this.win.getSelection()?.removeAllRanges();
     }
   }
   startPan(event) {
-    if (this.pinchActive) return;
+    if (this.pinchActive || this.gesture || event.defaultPrevented) return;
     this.commentPreview.hide();
     if (this.mode === "reading") {
       if (!event.target.closest(".pdfaw-selection-toolbar")) this.clearSelection();
       return;
     }
     const target = event.target;
-    if (target.closest("button, input, textarea, .pdfaw-comment-card, .pdfaw-filters, .pdfaw-selection-toolbar")) return;
-    if (event.button !== 1 && (event.button !== 0 || this.tool !== "hand" && target.closest(".pdfaw-page"))) {
-      if (event.button === 0) this.clearSelection();
-      return;
-    }
+    if (target.closest("button, input, textarea, .pdfaw-filters, .pdfaw-selection-toolbar")) return;
+    if (event.button !== 1 && (event.button !== 0 || this.tool !== "hand" && target.closest("[data-node]"))) return;
     event.preventDefault();
     this.clearSelection();
+    this.win.getSelection()?.removeAllRanges();
     this.root.focus();
-    this.gesture = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { x: this.camera.x, y: this.camera.y }, element: this.viewport };
+    const marquee = event.button === 0 && this.tool === "select" && event.pointerType !== "touch";
+    this.gesture = {
+      pointer: event.pointerId,
+      start: { x: event.clientX, y: event.clientY },
+      origin: { x: this.camera.x, y: this.camera.y },
+      element: this.viewport,
+      ...marquee ? { marquee: this.toWorld(event.clientX, event.clientY), additive: new Set(event.shiftKey ? this.selectedNodes : []) } : {}
+    };
+    if (marquee && !event.shiftKey) {
+      this.selectedNodes.clear();
+      this.updateSelectionPaint();
+    }
     this.viewport.setPointerCapture(event.pointerId);
-    this.viewport.addClass("is-panning");
+    this.viewport.toggleClass("is-panning", !marquee);
   }
   moveGesture(event) {
     if (this.pinchActive) return;
     const gesture = this.gesture;
     if (!gesture || gesture.pointer !== event.pointerId) return;
     const dx = event.clientX - gesture.start.x, dy = event.clientY - gesture.start.y;
-    if (gesture.card) {
-      gesture.card.position = { x: gesture.origin.x + dx / this.camera.zoom, y: gesture.origin.y + dy / this.camera.zoom };
-      const card = this.cards.get(gesture.card.id);
-      card.style.left = `${gesture.card.position.x}px`;
-      card.style.top = `${gesture.card.position.y}px`;
-      this.queueGeometry();
+    if (gesture.nodes) {
+      let delta = { x: dx / this.camera.zoom, y: dy / this.camera.zoom };
+      if (this.layout.snap && !event.altKey) {
+        const boxes = this.nodeBounds();
+        const original = [...gesture.nodes].flatMap(([key, point3]) => {
+          const box = boxes.get(key);
+          return box ? [{ ...box, x: point3.x, y: point3.y }] : [];
+        });
+        delta = snappedDelta(enclosingBounds(original), delta, [...boxes].filter(([key]) => !gesture.nodes.has(key)).map(([, box]) => box), 8 / this.camera.zoom);
+      }
+      for (const [key, origin] of gesture.nodes) this.setNodePosition(key, { x: origin.x + delta.x, y: origin.y + delta.y });
+      this.applyLayout();
+    } else if (gesture.marquee) {
+      const point3 = this.toWorld(event.clientX, event.clientY), origin = gesture.marquee;
+      const rect = { x: Math.min(origin.x, point3.x), y: Math.min(origin.y, point3.y), width: Math.abs(point3.x - origin.x), height: Math.abs(point3.y - origin.y) };
+      this.selectedNodes = new Set(gesture.additive);
+      for (const [key, box] of this.nodeBounds()) if ((!key.startsWith("a:") || this.cards.has(key.slice(2))) && intersects(rect, box)) this.selectedNodes.add(key);
+      Object.assign(this.marqueeEl.style, { left: `${rect.x * this.camera.zoom + this.camera.x}px`, top: `${rect.y * this.camera.zoom + this.camera.y}px`, width: `${rect.width * this.camera.zoom}px`, height: `${rect.height * this.camera.zoom}px` });
+      this.marqueeEl.hidden = false;
+      this.updateSelectionPaint();
     } else {
       this.camera.x = gesture.origin.x + dx;
       this.camera.y = gesture.origin.y + dy;
@@ -23983,20 +24213,22 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     }
   }
   endGesture(event) {
-    const gesture = this.gesture;
-    if (!gesture || gesture.pointer !== event.pointerId) return;
-    this.stopGesture();
+    if (this.gesture?.pointer !== event.pointerId) return;
+    this.stopGesture(event.type === "pointercancel");
   }
-  stopGesture() {
+  stopGesture(cancel = false) {
     const gesture = this.gesture;
     if (!gesture) return;
-    if (gesture.element.hasPointerCapture(gesture.pointer)) gesture.element.releasePointerCapture(gesture.pointer);
-    if (gesture.card) {
-      this.cards.get(gesture.card.id)?.removeClass("is-dragging");
-      void this.save();
-    }
-    this.viewport.removeClass("is-panning");
     this.gesture = null;
+    if (gesture.element.hasPointerCapture(gesture.pointer)) gesture.element.releasePointerCapture(gesture.pointer);
+    if (gesture.before) {
+      if (cancel && this.sidecar) {
+        this.sidecar.canvasLayout = gesture.before;
+        this.applyLayout();
+      } else this.commitLayout(gesture.before);
+    }
+    this.marqueeEl.hidden = true;
+    this.viewport.removeClass("is-panning");
   }
   pinchTouches(event) {
     return Array.from(event.touches).filter((touch) => {
@@ -24007,18 +24239,19 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
   startPinch(event) {
     const touches = this.pinchTouches(event);
     if (this.pinchActive && event.cancelable) event.preventDefault();
-    if (this.pinch || touches.length < 2 || !this.pageReady || !event.cancelable) return;
+    if (this.pinch || touches.length < 2 || !this.pdf || !event.cancelable) return;
     const [a, b] = touches;
     const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
     if (distance < 1) return;
     event.preventDefault();
-    this.stopGesture();
+    this.stopGesture(true);
     this.commentPreview.hide();
     this.selectionPointer = null;
     this.commentPress = null;
     this.clearSelection();
     this.win.getSelection()?.removeAllRanges();
-    const page = this.pageEl.getBoundingClientRect(), zoom = this.camera.zoom;
+    const zoom = this.camera.zoom, rect = this.viewport.getBoundingClientRect();
+    const page = this.mode === "reading" ? this.pageEl.getBoundingClientRect() : { left: rect.left + this.camera.x, top: rect.top + this.camera.y };
     this.pinch = { ids: [a.identifier, b.identifier], distance, zoom, anchor: {
       x: ((a.clientX + b.clientX) / 2 - page.left) / zoom,
       y: ((a.clientY + b.clientY) / 2 - page.top) / zoom
@@ -24035,7 +24268,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     const b = touches.find((touch) => touch.identifier === pinch.ids[1]);
     if (!a || !b) return;
     const center = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
-    const zoom = Math.max(0.1, Math.min(3, pinch.zoom * Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) / pinch.distance));
+    const zoom = Math.max(this.minimumZoom(), Math.min(3, pinch.zoom * Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) / pinch.distance));
     this.camera.zoom = zoom;
     if (this.mode === "reading") {
       this.applyCamera();
@@ -24065,28 +24298,29 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.pinch = null;
     this.pinchActive = false;
   }
-  cardBounds() {
-    return this.visibleAnnotations().map((annotation) => ({ ...this.position(annotation), width: CARD_WIDTH, height: this.cards.get(annotation.id)?.offsetHeight || 220 }));
-  }
   bounds() {
-    return sceneBounds(this.pageWidth, this.pageHeight, this.cardBounds());
+    return enclosingBounds([...this.nodeBounds().values()], 50);
   }
   setMode(mode) {
     if (mode === this.mode) return;
     this.resetPinch();
+    this.stopGesture();
     this.commentPress = null;
     this.clearSelection();
     this.win.getSelection()?.removeAllRanges();
     if (mode === "reading") this.canvasCamera = { ...this.camera };
     this.mode = mode;
+    this.multiSelect = false;
     this.root.toggleClass("pdfaw-reading", mode === "reading");
     this.modeButtons.forEach((button, key) => button.setAttribute("aria-pressed", String(key === mode)));
     this.toolButtons.get("hand").hidden = mode === "reading";
     this.setTool("select");
     this.renderAnnotations();
     this.viewport.scrollTo(0, 0);
-    if (mode === "reading") this.fit();
-    else {
+    if (mode === "reading") {
+      this.applyLayout();
+      void this.showPage(this.currentPage);
+    } else {
       if (this.canvasCamera) {
         this.camera = this.canvasCamera;
         this.applyCamera();
@@ -24105,10 +24339,13 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     this.camera.y += 45;
     this.applyCamera();
   }
+  minimumZoom() {
+    return this.mode === "reading" ? 0.1 : Math.min(0.1, fitCamera(this.bounds(), this.viewport.clientWidth, Math.max(100, this.viewport.clientHeight - 65)).zoom);
+  }
   zoomBy(factor, client) {
     const rect = this.viewport.getBoundingClientRect();
     const x = client ? client.x - rect.left : rect.width / 2, y = client ? client.y - rect.top : rect.height / 2;
-    const zoom = Math.max(0.1, Math.min(3, this.camera.zoom * factor)), ratio = zoom / this.camera.zoom;
+    const zoom = Math.max(this.minimumZoom(), Math.min(3, this.camera.zoom * factor)), ratio = zoom / this.camera.zoom;
     if (this.mode === "reading") {
       const left = (this.viewport.scrollLeft + x) * ratio - x, top = (this.viewport.scrollTop + y) * ratio - y;
       this.camera.zoom = zoom;
@@ -24121,19 +24358,20 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
   }
   applyCamera() {
     this.commentPreview.hide();
-    this.queuePageRaster();
     const { x, y, zoom } = this.camera;
     if (this.mode === "reading") {
       this.stage.setCssProps({ "--reading-width": `${this.pageWidth * zoom}px`, "--reading-height": `${this.pageHeight * zoom}px` });
       this.pageEl.setCssProps({ "--reading-transform": `scale(${zoom})` });
-      this.zoomLabel.setText(`${Math.round(zoom * 100)} %`);
+      this.zoomLabel.setText(`${zoom < 0.01 ? (zoom * 100).toFixed(1) : Math.round(zoom * 100)} %`);
+      this.queuePageRaster();
       this.positionSelectionBar();
       return;
     }
     this.stage.setCssProps({ "--canvas-transform": `translate(${x}px, ${y}px) scale(${zoom})` });
     this.viewport.style.backgroundPosition = `${x}px ${y}px`;
-    this.viewport.style.backgroundSize = `${22 * zoom}px ${22 * zoom}px`;
-    this.zoomLabel.setText(`${Math.round(zoom * 100)} %`);
+    this.viewport.style.backgroundSize = `${Math.max(12, 20 * zoom)}px ${Math.max(12, 20 * zoom)}px`;
+    this.zoomLabel.setText(`${zoom < 0.01 ? (zoom * 100).toFixed(1) : Math.round(zoom * 100)} %`);
+    this.queuePageRaster();
     this.positionSelectionBar();
     this.queueGeometry();
   }
@@ -24141,7 +24379,10 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     if (this.geometryFrame) return;
     this.geometryFrame = this.win.requestAnimationFrame(() => {
       this.geometryFrame = 0;
-      if (this.mode === "canvas") this.drawConnections();
+      if (this.mode === "canvas") {
+        this.drawConnections();
+        this.renderGroups();
+      }
     });
   }
   drawConnections() {
@@ -24150,7 +24391,7 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
       const card = this.cards.get(annotation.id);
       if (!card) continue;
       const color = this.categories.forAnnotation(annotation).hex;
-      const { path, anchor } = connection({ ...this.position(annotation), width: CARD_WIDTH, height: card.offsetHeight }, annotation.quads[0]);
+      const { path, anchor } = connection({ ...this.position(annotation), width: CARD_WIDTH, height: card.offsetHeight }, { ...annotation.quads[0], x: annotation.quads[0].x + (this.layout.pages[annotation.page]?.x ?? 0), y: annotation.quads[0].y + (this.layout.pages[annotation.page]?.y ?? 0) });
       svg(this.links, "path", { d: path, stroke: color, "stroke-width": 2, "stroke-dasharray": "8 7", "stroke-linecap": "round", fill: "none", "vector-effect": "non-scaling-stroke" });
       svg(this.links, "circle", { cx: anchor.x, cy: anchor.y, r: 3, fill: color });
     }
@@ -24158,6 +24399,38 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
   onKey(event) {
     if (event.key === "Escape") this.commentPreview.hide();
     if (event.target.closest("input, textarea, [contenteditable=true]")) return;
+    if (this.mode === "canvas" && this.sidecar) {
+      const mod = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();
+      if (mod && ["z", "y", "g", "a"].includes(key)) {
+        event.preventDefault();
+        if (key === "z" || key === "y") this.restoreLayout(key === "y" || event.shiftKey);
+        if (key === "g") {
+          if (event.shiftKey) this.ungroupSelection();
+          else this.groupSelection();
+        }
+        if (key === "a") {
+          this.selectedNodes = new Set(this.nodeBounds().keys());
+          this.updateSelectionPaint();
+        }
+        return;
+      }
+      if (event.key === "Escape") {
+        this.stopGesture(true);
+        this.selectedNodes.clear();
+        this.multiSelect = false;
+        this.updateSelectionPaint();
+      }
+      if (event.key.startsWith("Arrow") && this.selectedNodes.size) {
+        event.preventDefault();
+        const before = structuredClone(this.layout), distance = event.shiftKey ? 50 : 10, boxes = this.nodeBounds();
+        for (const member of this.expandedSelection()) {
+          const box = boxes.get(member);
+          this.setNodePosition(member, { x: box.x + (event.key === "ArrowLeft" ? -distance : event.key === "ArrowRight" ? distance : 0), y: box.y + (event.key === "ArrowUp" ? -distance : event.key === "ArrowDown" ? distance : 0) });
+        }
+        this.commitLayout(before);
+        return;
+      }
+    }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "Escape") {
       this.clearSelection();
@@ -24179,47 +24452,42 @@ var PdfAnnotatorView = class _PdfAnnotatorView extends import_obsidian8.FileView
     }
   }
 };
-var RemarkMyWordsPlugin = class extends import_obsidian8.Plugin {
+var RemarkMyWordsPlugin = class extends import_obsidian7.Plugin {
   async onload() {
     const stored = await this.loadData();
     this.categories = new CategoryStore(readCategorySettings(stored), (categories, theme) => this.saveData({ categories, theme }), readThemeColors(stored));
     this.sidebars = new Sidebars(this.app);
-    this.nativeCanvas = new NativeCanvas(this.app, this.categories, this.sidebars, (file, page, annotation, remove) => this.openReader(file, page, annotation?.id, remove));
-    this.register(() => this.nativeCanvas.destroy());
-    this.registerView(VIEW_TYPE, (leaf) => new PdfAnnotatorView(leaf, this.categories, this.sidebars, this.nativeCanvas));
+    this.registerView(VIEW_TYPE, (leaf) => new PdfAnnotatorView(leaf, this.categories, this.sidebars));
     for (const type of [COMMENTS_VIEW, PAGES_VIEW]) this.registerView(type, (leaf) => new PdfSidebar(leaf, type, this.categories, () => this.sidebars.context));
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
       if (leaf?.view instanceof PdfAnnotatorView) {
-        this.nativeCanvas.cancelActivation();
         leaf.view.updateSidebar();
         return;
       }
       if (leaf && [COMMENTS_VIEW, PAGES_VIEW].includes(leaf.view.getViewType())) return;
-      void this.nativeCanvas.activate(leaf).then((active) => {
-        if (!active && this.app.workspace.getMostRecentLeaf() === leaf) this.sidebars.update(null);
-      });
+      this.sidebars.update(null);
     }));
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.nativeCanvas.pruneActions()));
     this.app.workspace.onLayoutReady(() => {
       const leaf = this.app.workspace.getMostRecentLeaf();
       if (leaf?.view instanceof PdfAnnotatorView) leaf.view.updateSidebar();
-      else void this.nativeCanvas.activate(leaf);
     });
     this.registerObsidianProtocolHandler("remark-my-words", (params) => {
       if (params.vault && params.vault !== this.app.vault.getName()) return;
       const file = this.app.vault.getAbstractFileByPath(params.file ?? "");
-      if (file instanceof import_obsidian8.TFile && file.extension.toLowerCase() === "pdf") void this.openReader(file, Math.max(1, Number(params.page) || 1), params.comment);
+      if (file instanceof import_obsidian7.TFile && file.extension.toLowerCase() === "pdf") void this.openReader(file, Math.max(1, Number(params.page) || 1), params.comment);
     });
     this.addCommand({ id: "open-pdf-canvas", name: "Open PDF canvas", checkCallback: (checking) => {
       const view = this.app.workspace.getActiveViewOfType(PdfAnnotatorView);
       if (!view) return false;
-      if (!checking) void view.openNativeCanvas();
+      if (!checking) void view.openCanvas();
       return true;
     } });
     this.addCommand({ id: "rearrange-pdf-canvas", name: "Rearrange PDF canvas", checkCallback: (checking) => {
-      const leaf = this.app.workspace.getMostRecentLeaf();
-      if (!leaf || !this.nativeCanvas.owns(leaf)) return false;
-      if (!checking) void this.nativeCanvas.rearrange(leaf);
+      const view = this.app.workspace.getActiveViewOfType(PdfAnnotatorView);
+      if (!view) return false;
+      if (!checking) {
+        void view.openCanvas().then(() => view.rearrangeCards());
+      }
       return true;
     } });
     this.addCommand({ id: "open-pdf-in-annotator", name: "Open PDF", callback: () => this.openPdf() });
@@ -24227,7 +24495,7 @@ var RemarkMyWordsPlugin = class extends import_obsidian8.Plugin {
     this.addRibbonIcon("file-pen-line", "Remark My Words", () => this.openPdf());
     this.addSettingTab(new RemarkSettingsTab(this.app, this, this.categories, () => this.openPdf()));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-      if (file instanceof import_obsidian8.TFile && file.extension.toLowerCase() === "pdf") menu.addItem((item) => item.setTitle("Open in Remark My Words").setIcon("file-pen-line").onClick(() => {
+      if (file instanceof import_obsidian7.TFile && file.extension.toLowerCase() === "pdf") menu.addItem((item) => item.setTitle("Open in Remark My Words").setIcon("file-pen-line").onClick(() => {
         void this.app.workspace.getLeaf(false).setViewState({ type: VIEW_TYPE, state: { file: file.path }, active: true });
       }));
     }));

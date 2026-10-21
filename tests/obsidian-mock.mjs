@@ -45,7 +45,7 @@ export class Notice { constructor(text) { (window.notices ??= []).push(text); } 
 export function setIcon(el, name) { el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M9 9h6M9 13h6"/></svg>'; el.dataset.icon = name; }
 export class Menu {
   constructor() { this.items = []; }
-  addItem(fn) { const item = { setTitle(text) { this.text = text; return this; }, setIcon() { return this; }, setChecked() { return this; }, onClick(action) { this.action = action; return this; } }; fn(item); this.items.push(item); return this; }
+  addItem(fn) { const item = { setTitle(text) { this.text = text; return this; }, setIcon() { return this; }, setDisabled(value) { this.disabled=value; return this; }, setChecked() { return this; }, onClick(action) { this.action = action; return this; } }; fn(item); this.items.push(item); return this; }
   addSeparator() { return this; }
   showAtPosition() { window.lastMenu = this; }
   showAtMouseEvent() { window.lastMenu = this; }

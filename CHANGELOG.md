@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — 2026-10-21
+- Replace the separate native Canvas and Page layout modes with one multipage PDF Canvas, retaining direct text selection, highlights, and passage connections.
+- Move PDF pages and comment cards independently; navigate from thumbnails to each page’s current position.
+- Add Shift-click and marquee selection, named groups, shared group dragging, layout undo/redo, and optional grid/object snapping.
+- Use Obsidian context menus for pages, comments, groups, and the background.
+- Rearrange every page vertically with measured spacing and comments on both sides, preserving group membership.
+- Save layout in the existing annotation JSON without changing legacy highlight coordinates or touching older `.remark.canvas` files.
+- Render visible page bitmaps on demand with bounded concurrency and resolution; release offscreen bitmaps and text layers.
+- Add touch-friendly multiple selection and a Canvas actions menu for grouping without a keyboard or right-click.
+- Fit long documents into the overview and verify lazy rendering with a 120-page PDF.
+- Verify multipage layout, grouping, history, navigation, persistence, text selection, categories, Reading, and pinch gestures in automated tests.
+- Verify the unified view directly in Obsidian 1.14.4 on Linux, including native menus, actual dragging, saved groups, sidebar, and dropdowns. Actual iOS/Android app testing remains pending.
+
 ## 0.3.0 — 2026-10-21
 - Open a native Obsidian canvas with every PDF page as a movable file card and comments on both sides. Native grouping, context menus, resizing, and undo/redo are available.
 - Add a left PDF page sidebar that navigates to each page's current canvas position, including after manual moves.

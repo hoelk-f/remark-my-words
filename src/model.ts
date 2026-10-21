@@ -1,3 +1,5 @@
+import { readLayout } from "./board-model";
+import type { BoardLayout } from "./board-model";
 /** PDF geometry stays at the original reader's scale; camera zoom never changes it. */
 export const PDF_SCALE = 1.35;
 export const CARD_WIDTH = 370;
@@ -34,6 +36,7 @@ export type Sidecar = {
   version: 2;
   annotations: Annotation[];
   notes: string;
+  canvasLayout?: BoardLayout;
 };
 export type Bounds = { x: number; y: number; width: number; height: number };
 const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
@@ -83,6 +86,7 @@ export function readSidecar(raw: string, pdfPath: string): Sidecar {
     return { ...a, id: a.id, page: a.page, text: a.text, quads: a.quads, createdAt: a.createdAt, updatedAt: a.updatedAt,
       position: a.position, title: a.title, comment: a.comment, tags: a.tags, category, categoryStyle: a.categoryStyle, color: a.categoryStyle?.color ?? defaultCategoryStyle(category).color };
   });
+  if (data.canvasLayout !== undefined) data.canvasLayout = readLayout(data.canvasLayout);
   return { ...data, pdfPath, version: 2, annotations, notes: data.notes ?? "" };
 }
 
@@ -109,6 +113,6 @@ export function sceneBounds(pageWidth: number, pageHeight: number, cards: Bounds
 }
 
 export function fitCamera(bounds: Bounds, width: number, height: number) {
-  const zoom = Math.max(0.1, Math.min(1.5, width / bounds.width, height / bounds.height));
+  const zoom = Math.max(0.0001, Math.min(1.5, width / bounds.width, height / bounds.height));
   return { zoom, x: (width - bounds.width * zoom) / 2 - bounds.x * zoom, y: (height - bounds.height * zoom) / 2 - bounds.y * zoom };
 }

@@ -1,21 +1,21 @@
-﻿# Remark My Words
+# Remark My Words
 
 **Read a PDF. Mark a passage. Give your thoughts room.**
 
 Remark My Words is an Obsidian community plugin for reading and annotating PDFs.
-Write categorized comments beside passages, then open a native Obsidian canvas
-with every PDF page and movable comment cards.
+Write categorized comments beside passages and arrange every PDF page with its
+comments on one interactive canvas.
 Use it for manuals, reports, books, articles, and other PDF documents in your vault.
 
 ![PDF page surrounded by categorized comment cards and colored connectors](docs/images/canvas-preview.png)
 
-*Page layout preview with a sample document in the browser test harness.*
+*Canvas preview with a sample document in the browser test harness.*
 
 ## Read closely, think spatially
 
 | Reading mode | Canvas mode |
 | --- | --- |
-| Focus on one PDF page with normal scrolling. | Put all pages on one native Obsidian canvas. |
+| Focus on one PDF page with normal scrolling. | Arrange all PDF pages on one canvas. |
 | Select a passage and add a comment from the floating toolbar. | Move pages and comment cards, create groups, and use native menus. |
 | Click a highlight or open comments in the right sidebar. | Jump to a moved page from the left sidebar. |
 | Keep your reading position when saving a comment. | Rearrange pages vertically with comments on both sides. |
@@ -39,20 +39,21 @@ The PDF renderer is bundled with the plugin, so no additional download is needed
 
 1. After installing, enable **Remark My Words** under **Settings > Community plugins**.
 2. Run **Remark My Words: Open PDF** from the command palette or click the pen-and-file ribbon icon. The active PDF opens immediately; otherwise choose a PDF from the vault. You can also right-click a PDF and choose **Open in Remark My Words**.
-3. Use **Reading mode** to annotate, or **Canvas mode** to open the whole document in Obsidian Canvas. Enable Obsidian's **Canvas** core plugin. **Page layout** keeps the original single-page annotation layout available.
+3. Choose **Reading mode** for one page at a time or **Canvas mode** for the whole document. Both modes support passage selection and comments.
 4. Select text, click a category in the floating toolbar, and fill in **Add comment**. Right-clicking selected text also offers categories.
 5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. **Read page comments** opens a dockable right sidebar that follows page navigation and supports editing and deletion.
-6. In Canvas, use Obsidian's normal selection, dragging, resizing, grouping, right-click menus, and undo/redo. The **PDF pages** sidebar on the left jumps to each page's current position. **Rearrange pages and comments** places pages underneath each other, leaving room for comments on both sides and preserving group membership.
+6. In Canvas, drag a page by its title bar or a comment by its header. Shift-click to select several items, or drag a selection rectangle on the background. On touchscreens, enable **Select multiple items** and tap the items. Group the selection from the toolbar or right-click menu. Drag the group title to move its members together. The page thumbnails on the left jump to each page's current position. **Rearrange pages and comments** stacks pages vertically with comments on both sides, calculating spacing from their heights and preserving groups.
 
-The canvas is saved next to the PDF as `<document>.pdf.remark.canvas`. It contains
-native PDF embeds that open at their assigned page, and editable text cards linked
-to those page cards. The canvas uses Obsidian's own appearance and controls.
-Use **Edit source comment** on a card or the right sidebar to change the original
-PDF annotation. **Refresh comments from PDF** updates generated cards and adds
-new annotations. Direct edits to canvas text remain independent and are preserved;
-refreshing does not overwrite them or restore cards you removed. Reopening Canvas
-from the reader also refreshes comments while keeping your layout, groups, and
-additional cards. Use **Rearrange** when new comments need more space.
+Canvas uses the same PDF text layers, highlights, comments, and passage connections
+as Reading. Right-click opens Obsidian menus for the page, comment, group, or
+background. The **Canvas actions** toolbar menu also exposes these layout actions
+on touchscreens. **Undo/Redo canvas change** restores layout operations; **Snap to grid
+and objects** enables alignment, with Alt temporarily bypassing it while dragging.
+Double-click a group title to rename it; **Ungroup selection** keeps its members.
+
+The layout is saved in the existing annotation JSON file. Older `.remark.canvas`
+files from version 0.3.0 remain untouched and can still be opened in Obsidian.
+Their independent edits are not imported into this unified PDF view.
 
 Navigate pages with thumbnails, arrows, or the page number. In Reading, mouse-wheel
 scrolling past the bottom opens the next page at its top, or past the top opens the
@@ -96,10 +97,9 @@ sync these files; the plugin does not provide its own synchronization.
 
 ## Keyboard shortcuts
 
-The shortcuts below apply to Reading and Page layout. Native Canvas uses
-Obsidian's own shortcuts and touch controls. On touchscreens, spread or pinch two
-fingers over the reader to zoom around their midpoint. In Reading, one finger
-scrolls the page; in Page layout, use the hand tool to pan with one finger.
+On touchscreens, spread or pinch two fingers over the PDF to zoom around their
+midpoint. In Reading, one finger scrolls the page; in Canvas, drag the background
+or use the hand tool to pan with one finger.
 
 | Shortcut | Action |
 | --- | --- |
@@ -109,14 +109,17 @@ scrolls the page; in Page layout, use the hand tool to pan with one finger.
 | 0 | Fit page and cards in Canvas; fit page width in Reading |
 | Page Up / Page Down | Previous / next page |
 | Escape | Dismiss a preview or clear the selection |
-| Arrow keys on a focused card | Move by 10 units; Shift moves by 40 |
+| Arrow keys on selected items | Move by 10 units; Shift moves by 50 |
+| Ctrl/⌘ + A | Select all pages and comments in Canvas |
+| Ctrl/⌘ + G / Shift + G | Group / ungroup selection in Canvas |
+| Ctrl/⌘ + Z / Shift + Z | Undo / redo Canvas layout changes |
 | Enter on a focused card | Edit the comment |
 | Ctrl/⌘ + Enter in the description field | Save the comment |
 
 ## Current limits
 
-- Reading and Page layout display one PDF page at a time; native Canvas contains all pages.
-- Native canvas connections attach to page cards. Passage-level highlights and annotation editing remain in the reader and Page layout.
+- The unified Canvas is a plugin view with PDF annotation tools and Obsidian menus. It does not embed Obsidian's complete Canvas editor or support arbitrary native Canvas cards.
+- Undo/redo covers layout changes in the current session. Comment deletion still requires confirmation and cannot be undone.
 - Scanned documents need an existing text layer; OCR is not included.
 - Annotations live in the JSON file, not as native annotations inside the PDF.
 - Concurrent edits to the same PDF from multiple views or devices are not merged.

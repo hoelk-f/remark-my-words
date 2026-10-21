@@ -1,3 +1,4 @@
+import { testBoard } from "./board-browser.mjs";
 import { testCategories } from "./category-browser.mjs";
 import { testRendering } from "./rendering-browser.mjs";
 import { testTouch } from "./touch-browser.mjs";
@@ -15,7 +16,7 @@ const artifacts = path.join(root, '.test-artifacts');
 await mkdir(artifacts, { recursive: true });
 const bundle = await build({ absWorkingDir: root, entryPoints: ['tests/browser-entry.mjs'], bundle: true, write: false, format: 'esm', plugins: [pdfWorkerPlugin], alias: { obsidian: path.join(root, 'tests/obsidian-mock.mjs') } });
 
-function fixturePdf() {
+function fixturePdf(pages = 2) {
   const line = (text, x, y, size = 12, font = 'F1') => `BT /${font} ${size} Tf 1 0 0 1 ${x} ${y} Tm <${Buffer.from(text, 'latin1').toString('hex')}> Tj ET\n`;
   let stream = line('Universität Musterstadt', 48, 795, 10) + line('Müller et al. (2023)', 432, 795, 10);
   stream += line('F', 48, 768, 18) + line('RAMEWORK', 57, 768, 14);
@@ -36,9 +37,8 @@ function fixturePdf() {
   const second = line('Diskussion und Ausblick', 48, 750, 23, 'F2') + line('Weitere Forschung untersucht langfristige Effekte.', 48, 690) + line('2', 292, 30, 10);
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 7 0 R >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 8 0 R >>',
+    `<< /Type /Pages /Kids [${Array.from({length:pages},(_,i)=>`${i+3} 0 R`).join(' ')}] /Count ${pages} >>`,
+    ...Array.from({length:pages},(_,i)=>`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 ${i===0?842:792}] /Resources << /Font << /F1 ${pages+3} 0 R /F2 ${pages+4} 0 R >> >> /Contents ${i===0?pages+5:pages+6} 0 R >>`),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>',
     `<< /Length ${stream.length} >>\nstream\n${stream}endstream`,
@@ -47,14 +47,14 @@ function fixturePdf() {
   let pdf = '%PDF-1.4\n', offsets = [0];
   objects.forEach((object, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; });
   const start = pdf.length;
-  pdf += `xref\n0 9\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 9 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
+  pdf += `xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
   return Buffer.from(pdf);
 }
 const html = `<!DOCTYPE html><html><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body,#app{height:100%;margin:0}body{--font-interface:Arial,sans-serif;font-family:Arial,sans-serif}button,input,textarea,select{font:inherit}button{border:1px solid #424855;border-radius:5px} .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;background:#242832;color:white;padding:25px;border:1px solid #777;border-radius:12px;overflow:auto}.setting-item{display:flex;justify-content:space-between;padding:12px 0}.setting-item-control{order:1;display:flex;gap:8px}</style><link rel="stylesheet" href="/styles.css"><div id="app"></div><script type="module" src="/bundle.js"></script></html>`;
 const routes = new Map([
   ['/', ['text/html', html]], ['/bundle.js', ['text/javascript', bundle.outputFiles[0].contents]],
   ['/styles.css', ['text/css', await readFile(path.join(root, 'styles.css'))]],
-  ['/fixture.pdf', ['application/pdf', fixturePdf()]],
+  ['/fixture.pdf', ['application/pdf', fixturePdf()]], ['/long-fixture.pdf', ['application/pdf', fixturePdf(120)]],
 ]);
 const server = createServer((req, res) => { const route = routes.get(req.url); res.writeHead(route ? 200 : 404, { 'Content-Type': route?.[0] ?? 'text/plain' }); res.end(route?.[1] ?? 'Not found'); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -91,13 +91,12 @@ try {
   assert.ok(await evaluate('document.querySelectorAll(".pdfaw-textlayer span").length') > 20);
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.pdfaw-modes button'), b => ({ text: b.textContent, label: b.getAttribute('aria-label'), icon: b.dataset.icon }))`), [
     { text: '', label: 'Canvas mode', icon: 'layout-dashboard' },
-    { text: '', label: 'Page layout', icon: 'layout-panel-left' },
     { text: '', label: 'Reading mode', icon: 'book-open' },
   ], 'Mode controls use accessible icons');
   // Obsidian disables selection on its UI; the PDF layer must explicitly opt in.
   await evaluate('document.body.style.userSelect = "none"');
   for (const mode of ['canvas', 'reading']) {
-    await evaluate(`view.setMode('${mode}')`);
+    await evaluate(`view.setMode('${mode}');view.pages.ensure(view.currentPage)`);
     const boxes = await evaluate(`(() => {
       const spans=[...document.querySelectorAll('.pdfaw-textlayer span')];
       return ['F','RAMEWORK'].map(text=>{const r=spans.find(s=>s.textContent===text).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};});
@@ -171,15 +170,15 @@ try {
   await until('document.querySelectorAll(".pdfaw-connections path").length === 6');
   const screenshot = await cdp('Page.captureScreenshot', { format: 'png' });
   await writeFile(path.join(artifacts, 'canvas.png'), Buffer.from(screenshot.data, 'base64'));
-  const drag = await evaluate(`(() => { const el=document.querySelector('.pdfaw-card-header'), r=el.getBoundingClientRect(); return {x:r.x+50,y:r.y+10,oldX:view.sidecar.annotations[0].position.x,oldY:view.sidecar.annotations[0].position.y,zoom:view.camera.zoom}; })()`);
+  const drag = await evaluate(`(() => { const el=document.querySelector('.pdfaw-card-header'), r=el.getBoundingClientRect(); return {x:r.x+50,y:r.y+10,oldX:view.layout.cards[view.sidecar.annotations[0].id].x,oldY:view.layout.cards[view.sidecar.annotations[0].id].y,zoom:view.camera.zoom}; })()`);
   await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: drag.x, y: drag.y, button: 'left', clickCount: 1 });
   await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: drag.x + 60, y: drag.y + 40, button: 'left', buttons: 1 });
   await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: drag.x + 60, y: drag.y + 40, button: 'left', clickCount: 1 });
   await evaluate('view.saveQueue');
-  const moved = await evaluate('view.sidecar.annotations[0].position');
+  const moved = await evaluate('view.layout.cards[view.sidecar.annotations[0].id]');
   assert.ok(Math.abs(moved.x - drag.oldX - 60 / drag.zoom) < 1, 'Drag must account for zoom');
   await evaluate('view.onLoadFile(new TFile("Forschungspapier.pdf"))');
-  assert.deepEqual(await evaluate('view.sidecar.annotations[0].position'), moved, 'Position survives reload');
+  assert.deepEqual(await evaluate('view.layout.cards[view.sidecar.annotations[0].id]'), moved, 'Position survives reload');
   await evaluate(`document.querySelector('.pdfaw-filters button:nth-child(2)').click()`);
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 1);
   await evaluate(`document.querySelector('.pdfaw-filters button').click(); view.zoomBy(1.3);`);
@@ -207,7 +206,7 @@ try {
   assert.equal(await evaluate('view.sidecar.annotations.length'), 6);
   await evaluate(`document.querySelector('.pdfaw-comment-card').focus();document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));view.saveQueue`);
   await evaluate('view.showPage(2)');
-  assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 0);
+  assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 6, 'Canvas retains comments from every page');
   await evaluate('view.showPage(1)');
   const canvasState = await evaluate('({ camera: {...view.camera}, positions: view.sidecar.annotations.map(a=>a.position) })');
   await evaluate(`document.querySelector('button[aria-label="Reading mode"]').click()`);
@@ -345,7 +344,7 @@ try {
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).comment'), 'Reading mode comment');
   assert.equal(await evaluate('view.viewport.scrollTop'), scrollBefore, 'Adding a comment preserves reading position');
   assert.equal(await evaluate('view.mode'), 'reading');
-  await evaluate(`document.querySelector('button[aria-label="Page layout"]').click()`);
+  await evaluate(`document.querySelector('button[aria-label="Canvas mode"]').click()`);
   assert.deepEqual(await evaluate('view.camera'), canvasState.camera, 'Canvas camera survives reading mode');
   assert.deepEqual(await evaluate('view.sidecar.annotations.slice(0,-1).map(a=>a.position)'), canvasState.positions.slice(1));
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-comment-card").length'), 6);
@@ -353,7 +352,7 @@ try {
   assert.equal(await evaluate('view.sidecar.annotations.at(-1).comment'), 'Reading mode comment', 'Reading comments survive reopening');
   for (const width of [320, 768, 1024, 1440]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 941, deviceScaleFactor: 1, mobile: false });
-    await evaluate(`view.setMode('reading'); view.fit()`);
+    await evaluate(`view.setMode('reading'); view.fit(); view.pages.ensure(view.currentPage)`);
     assert.ok(await evaluate('view.pageEl.getBoundingClientRect().width <= view.viewport.clientWidth'), `Reading page fits at ${width}px`);
     await evaluate(`(() => { const span=document.querySelector('.pdfaw-textlayer span');const r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);view.captureSelection(); })()`);
     assert.ok(await evaluate(`(() => { const r=view.selectionBar.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth; })()`), `Selection toolbar stays on screen at ${width}px`);
@@ -366,6 +365,7 @@ try {
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-sidebar-comment").length'),0);
   await evaluate('view.showPage(1)');
   await evaluate('document.querySelector(".test-sidebar").style.display="none"');
+  await testBoard({evaluate, until, cdp});
   await testCategories({evaluate, until, cdp});
   await testRendering({evaluate, until, cdp});
   await testTouch({evaluate, until, cdp});

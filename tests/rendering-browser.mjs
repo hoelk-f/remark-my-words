@@ -45,14 +45,15 @@ export async function testRendering({ evaluate, until, cdp }) {
   await settled();
   // Hold a real completed raster while navigating to catch a stale canvas swap.
   await evaluate(`(() => {
-    window.originalRenderCanvas = view.renderCanvas;
+    window.heldPage = view.pages.surfaces.get(view.currentPage).page;
+    window.originalRender = heldPage.render;
     window.rasterHeld = false;
-    view.renderCanvas = async function(...args) {
-      await originalRenderCanvas.apply(this, args);
-      if (!window.rasterHeld) {
-        window.rasterHeld = true;
-        await new Promise(resolve => { window.releaseRaster = resolve; });
-      }
+    heldPage.render = function(...args) {
+      const task = originalRender.apply(this, args);
+      const promise = task.promise.then(async () => {
+        if (!window.rasterHeld) { window.rasterHeld = true; await new Promise(resolve => { window.releaseRaster = resolve; }); }
+      });
+      return {promise, cancel:()=>task.cancel()};
     };
     window.visibleCanvas = view.pageCanvas;
     view.zoomBy(1.15);
@@ -60,7 +61,7 @@ export async function testRendering({ evaluate, until, cdp }) {
   await until('window.rasterHeld');
   assert.equal(await evaluate('view.pageCanvas === visibleCanvas && visibleCanvas.isConnected'), true, 'The previous bitmap stays visible until the replacement is ready');
   await evaluate('view.showPage(2)');
-  await evaluate('releaseRaster();view.renderCanvas = originalRenderCanvas');
+  await evaluate('releaseRaster();heldPage.render = originalRender');
   await evaluate('new Promise(resolve => requestAnimationFrame(resolve))');
   assert.equal(await evaluate('view.pageCanvas.getAttribute("aria-label")'), 'PDF page 2', 'An old render cannot replace a newly opened page');
   await evaluate('view.viewport.scrollTop = view.viewport.scrollHeight;view.viewport.dispatchEvent(new WheelEvent("wheel",{deltaY:700,bubbles:true,cancelable:true}))');

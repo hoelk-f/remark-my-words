@@ -100,7 +100,19 @@ export async function testTouch({ evaluate, until, cdp }) {
     await send('touchEnd');
     await evaluate('view.showPage(1)');
     assert.equal(await evaluate('JSON.stringify(view.sidecar.annotations)'),annotations,'Touch navigation never edits annotations');
-    console.log('PASS: pinch zoom in both modes, moving anchor, limits, remaining/third fingers, cancellation, native scroll and hand pan');
+    await evaluate(`view.setMode('canvas');view.fit();view.selectedNodes.clear();document.querySelector('button[aria-label="Select multiple items"]').click()`);
+    for (const number of [1,2]) {
+      const point = await evaluate(`(() => {const r=view.pages.surfaces.get(${number}).body.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,id:1};})()`);
+      await send('touchStart',[point]); await send('touchEnd');
+    }
+    assert.equal(await evaluate('view.expandedSelection().size'),2,'Touch selection can select multiple PDF pages without a keyboard');
+    await evaluate(`document.querySelector('button[aria-label="Group selection"]').click();document.querySelector('.pdfaw-group-name').value='Touch group';[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click()`);
+    assert.equal(await evaluate('view.layout.groups.at(-1).name'),'Touch group');
+    assert.equal(await evaluate('view.multiSelect'),false,'Creating a group returns to normal dragging');
+    await evaluate(`document.querySelector('button[aria-label="Canvas actions"]').click()`);
+    assert.ok(await evaluate(`lastMenu.items.some(item=>item.text==='Rename group') && lastMenu.items.some(item=>item.text==='Ungroup selection')`),'Touch users can access layout actions without right-click');
+    await evaluate(`lastMenu.items.find(item=>item.text==='Ungroup selection').action();view.saveQueue`);
+    console.log('PASS: pinch zoom in both modes, moving anchor, limits, remaining/third fingers, cancellation, native scroll, hand pan and touch grouping');
   } finally {
     if (touching) await send('touchCancel');
     await cdp('Emulation.setTouchEmulationEnabled',{enabled:false});

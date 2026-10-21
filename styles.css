@@ -102,7 +102,7 @@
 .pdfaw-preview-actions button:hover, .pdfaw-preview-actions button:focus-visible { border-color: var(--pdfaw-accent); color: var(--pdfaw-accent); }
 .pdfaw-preview-actions button[aria-label="Delete comment"]:hover, .pdfaw-preview-actions button[aria-label="Delete comment"]:focus-visible { border-color: var(--text-error); color: var(--text-error); }
 .pdfaw-comment-preview:focus-visible { outline: 2px solid var(--pdfaw-accent); outline-offset: -2px; }
-.pdfaw-root .pdfaw-read-comments { display: none; }
+.pdfaw-root .pdfaw-read-comments { display: inline-flex; }
 .pdfaw-reading .pdfaw-read-comments { display: inline-flex; }
 .pdfaw-reading .pdfaw-viewport { overflow: auto; background-image: none; touch-action: pan-x pan-y; }
 .pdfaw-reading .pdfaw-stage { position: relative; flex-shrink: 0; will-change: auto; transform: none; margin: 24px auto; width: var(--reading-width); height: var(--reading-height); }
@@ -216,3 +216,16 @@
 .pdfaw-sidebar-comment { padding: 12px; margin-top: 16px; border: 1px solid var(--pdfaw-border); border-left: 3px solid var(--category); border-radius: 6px; }
 .pdfaw-sidebar-comment h4 { margin: 10px 0; overflow-wrap: anywhere; }
 .pdfaw-sidebar-comment blockquote { margin: 12px 0; padding-left: 10px; border-left: 2px solid var(--pdfaw-border); color: var(--pdfaw-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.pdfaw-page-node { position: absolute; z-index: 1; }
+.pdfaw-page-handle { position: absolute; bottom: 100%; left: 0; width: 100%; height: 32px; padding: 4px 12px; background: var(--pdfaw-panel); border: 1px solid var(--pdfaw-border); color: var(--pdfaw-text); border-radius: 6px 6px 0 0; cursor: grab; touch-action: none; user-select: none; }
+.pdfaw-page-node.is-selected, .pdfaw-comment-card.is-selected { outline: 3px solid var(--interactive-accent, var(--pdfaw-accent)); outline-offset: 5px; }
+.pdfaw-groups { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.pdfaw-group { position: absolute; border: 2px solid var(--pdfaw-border); border-radius: 12px; background: color-mix(in srgb, var(--pdfaw-muted) 4%, transparent); }
+.pdfaw-group.is-selected { border-color: var(--interactive-accent, var(--pdfaw-accent)); }
+.pdfaw-group-handle { position: absolute; top: -34px; left: 0; min-width: 120px; max-width: 100%; height: 32px; padding: 2px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--pdfaw-panel); border: 1px solid var(--pdfaw-border); border-radius: 6px; font-size: 18px; cursor: grab; pointer-events: auto; touch-action: none; user-select: none; }
+.pdfaw-marquee { position: absolute; pointer-events: none; z-index: 20; border: 1px solid var(--interactive-accent, var(--pdfaw-accent)); background: color-mix(in srgb, var(--interactive-accent, var(--pdfaw-accent)) 15%, transparent); }
+.pdfaw-reading .pdfaw-page-handle, .pdfaw-reading .pdfaw-groups, .pdfaw-reading .pdfaw-canvas-control { display: none; }
+.pdfaw-reading .pdfaw-page-node { width: 100% !important; height: 100% !important; outline: none; }
+.pdfaw-root button:disabled { opacity: 0.35; cursor: default; }
+.pdfaw-group-name { width: 100%; margin: 12px 0; }

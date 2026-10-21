@@ -25,8 +25,8 @@ installable files into `dist/remark-my-words/`. No npm publication is needed.
 - `src/editor.ts`: comment form.
 - `src/comment-preview.ts`: Reading-mode previews.
 - `src/sidebar.ts`: dockable page navigation and page comments.
-- `src/canvas-model.ts`: lossless JSON Canvas validation, merging, and multipage layout.
-- `src/native-canvas.ts`: native Canvas file lifecycle, toolbar actions, and viewport navigation.
+- `src/board-model.ts`: layout validation, migration, spacing, snapping, and layout history.
+- `src/pdf-pages.ts`: shared multipage surfaces with lazy raster and text-layer rendering.
 - `styles.css`: plugin-scoped styles.
 - `scripts/pdf-worker-plugin.mjs`: embeds the matching PDF.js worker as text at build time.
 - `tests/`: model and browser integration tests.
@@ -34,7 +34,10 @@ installable files into `dist/remark-my-words/`. No npm publication is needed.
 PDF coordinates use a fixed scale of 1.35. Camera zoom is separate, so changing
 the display does not change saved highlights or card positions. The PDF bitmap
 is rendered at the current camera zoom times the display's pixel density, with
-limits of approximately 16 megapixels and 8192 pixels per side. Zoom changes are
+limits of approximately 16 megapixels and 8192 pixels per side, with a shared
+32-megapixel target across visible pages and at most two page renders at a time.
+Offscreen pages keep lightweight geometry and highlights; their bitmap and text
+layer are released unless they own an active text selection. Zoom changes are
 debounced for 120 ms; a completed bitmap replaces the previous one without
 rebuilding the text layer or selection. Stale renders are canceled when zoom,
 page, or document changes. Dialogs share the view's configured theme colors.
@@ -53,41 +56,35 @@ to another Chromium executable on macOS or Linux. The test uses a generated PDF,
 real PDF.js rendering, and a mocked Obsidian API and in-memory vault.
 
 It covers live selection, comments, previews, category changes, dragging at zoom,
-Reading/Canvas switching, persistence, search, notes, invalid-data protection,
+Reading/Canvas switching, persistence, layout groups/history, page navigation, notes, invalid-data protection,
 and narrow windows. It deliberately does not serve a separate worker file.
 Screenshots are written to `.test-artifacts/`. The mock uses placeholder icons;
 Obsidian provides the real icons in the host application.
 
 CI builds on Windows and Linux and runs browser interactions on Windows.
 
-## Native Canvas
+## Unified PDF Canvas
 
-The reader creates `<pdf-path>.remark.canvas` using JSON Canvas 1.0. Every page is
-a native file node with `subpath: #page=N`; comments are native text nodes with
-connections to their page. The top-level `remarkMyWords` metadata identifies the
-source PDF, page sizes and previously imported annotations. Node metadata maps
-pages/comments and keeps the last generated text. Obsidian retains these extra
-fields on native save. Unknown properties, user-created nodes and edges survive
-updates. Invalid or unrelated canvas files are rejected before writing.
+Reading and Canvas share the PDF.js page surfaces. Canvas displays every page,
+with page positions independent from comment positions. The title bar moves a
+page without intercepting native passage selection. Page navigation centers on
+the stored page position, and connections add that origin to page-local quads.
 
-Refresh updates only untouched generated text. Native text edits remain independent
-of source annotations, and removed native cards are not recreated. Source comment
-editing uses the sidebar or an `obsidian://remark-my-words` link that identifies
-the vault, PDF, page and annotation. Rearrange uses current node dimensions and
-expands containing groups to retain their membership. Explicit native edits are
-saved through `TextFileView.setViewData` and `save`; recording the current data
-before an update makes native Undo restore even a just-completed drag.
+Selection supports Shift-click and a background marquee. Groups contain stable
+`p:<page>` and `a:<annotation-id>` keys; dragging a group moves members by a shared
+delta. Group frames follow their contents. Rearrange uses actual card heights and
+PDF page sizes, keeps group membership, and spaces the next page after the taller
+of the page and its two comment columns. Layout history snapshots only layout
+state, so it cannot roll back comment edits or resurrect deleted annotations.
 
-Most integration uses public workspace, file view and vault APIs. Page centering
-uses the native Canvas `zoomToBbox` method behind a runtime guard because no public
-Canvas viewport API exists. The canvas remains usable if that method is unavailable.
-
-For host integration checks, use an isolated vault and enable the Canvas core
-plugin. Verify a PDF with mixed page sizes and long comments, native page dragging,
-the page sidebar after moving cards, background and multi-selection context menus,
-group creation, rearrange, undo/redo, reopening, source comment refresh and the
-category dropdown. These flows were exercised in Obsidian 1.14.4 on Linux for
-0.3.0. Browser mocks do not substitute for this host test or certify iOS/Android.
+Use an isolated vault for host tests. Verify page dragging, thumbnail navigation
+after moving a page, selection/grouping, actual Obsidian context menus, group
+movement and naming, rearrange, undo/redo, reopening, the comments sidebar, and
+category dropdowns. Browser mocks do not substitute for this host test or certify
+iOS/Android. These host flows were exercised in Obsidian 1.14.4 on Linux for
+0.4.0. The browser suite also tests a 120-page PDF and touch grouping.
+Old `.remark.canvas` files are never read, updated, or removed by the
+unified view. The protocol handler remains available for their source links.
 
 ## Data compatibility
 
@@ -95,6 +92,13 @@ The sidecar filename remains `<pdf-path>.obsidian-annot.json`, including after
 the plugin rename. Version 2 has `pdfPath`, `notes`, and `annotations`. Each
 annotation stores `id`, one-based `page`, `quads`, `text`, `category`, `color`,
 timestamps, and optional `title`, `comment`, `tags`, and `position`.
+
+An optional `canvasLayout` contains `version: 1`, `pages`, `cards`, `groups`, and
+`snap`. Page/card maps store world-space `{x,y}` positions. Groups store a stable
+`id`, `name`, and `members`. Old annotation `position` fields remain page-local
+and unchanged; initial Canvas card placement adds the page origin. Canvas layout
+is validated before edits and is saved with the annotations. Existing unknown
+sidecar fields remain intact. Layout history is session-only.
 
 | Previous category | Current category |
 | --- | --- |

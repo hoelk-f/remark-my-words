@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { transform } from 'esbuild';
-const source = await readFile(new URL('../src/model.ts', import.meta.url), 'utf8');
-const { code } = await transform(source, { loader: 'ts', format: 'esm' });
+import { build } from 'esbuild';
+const result = await build({entryPoints:['src/model.ts'],bundle:true,write:false,format:'esm'});
+const code = result.outputFiles[0].text;
 const { readSidecar, connection, sceneBounds, fitCamera, defaultPosition } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 const annotation = { id: 'legacy', page: 2, color: 'red', quads: [{ x: 120, y: 250, w: 80, h: 20 }], text: 'Original text', comment: 'Keep this', createdAt: 1, updatedAt: 2 };
 const original = { version: 1, pdfPath: 'old.pdf', notes: 'Original notes', annotations: [annotation] };
