@@ -16,23 +16,37 @@ before running it. A real run publishes the plugin publicly on GitHub.
 
 The script:
 
-1. Checks the branch, repository URL, Git identity, and unfinished Git operations.
+1. Checks the branch, repository URL, unfinished Git operations, and that GitHub CLI is signed in as `hoelk-f`. Both the effective Git author and committer must use the maintainer identity below, including any environment overrides.
 2. Fetches the remote. If necessary, checkpoints local work and merges `origin/main`. Conflicts stop the release without pushing; the checkpoint preserves local work.
 3. Updates `package.json`, `package-lock.json`, `manifest.json`, `versions.json`, and the changelog. Add release details under `## Unreleased` beforehand; otherwise a version entry links readers to the generated GitHub notes.
 4. Installs locked dependencies, runs the official Obsidian linter, typechecking, model tests, release integration tests, browser tests, reproducibility tests, and the production build.
 5. Commits the result and creates an annotated tag matching the manifest version, with no `v` prefix.
 6. Pushes `main` and the tag atomically, so either both remote refs update or neither does.
-7. Waits for the **Publish release** GitHub Action to repeat the checks and publish `main.js`, `manifest.json`, and `styles.css`. The Action verifies that the build matches committed main.js, creates GitHub provenance attestations, and uploads and checks all assets before making the release public.
+7. Creates a draft release through the locally authenticated `hoelk-f` account. This sets the release's author to the maintainer. The **Publish release** GitHub Action repeats the checks, verifies that the build matches committed main.js, creates provenance attestations, and uploads and checks `main.js`, `manifest.json`, and `styles.css` before publishing that draft. The Action requires the draft's author to be `hoelk-f` and never creates a bot-owned replacement.
 8. Prints the published release URL and the Obsidian Community submission link.
 
-No local GitHub CLI or personal access token is required. Git uses your existing
-GitHub authentication; Actions uses its built-in `GITHUB_TOKEN`.
+GitHub CLI must be installed and authenticated as `hoelk-f` (`gh auth login`).
+Git uses the maintainer's push access. Actions uses its built-in `GITHUB_TOKEN`
+only to upload assets and publish the existing maintainer-owned draft; no personal
+token is stored in repository secrets. Historical public releases are not recreated.
+
+Configure the repository identity once in each checkout:
+
+```sh
+git config --local user.name "Florian Hölken"
+git config --local user.email "hoelken.florian@web.de"
+git config --local user.useConfigOnly true
+```
+
+This address is already associated with `hoelk-f` on GitHub. If changing it later,
+update `MAINTAINER` in `scripts/release.mjs` as well. Release checks reject different
+author/committer identities before modifying files, creating commits, or pushing.
 
 ### Prerequisites
 
-- Node.js 22 or newer, npm, and Git with your author name/email configured.
+- Node.js 22 or newer, npm, Git configured as above, and GitHub CLI signed in as `hoelk-f`.
 - Push access to `hoelk-f/remark-my-words`, including permission to update workflows. Branch/tag protection must allow this maintainer-driven release flow; the script never force-pushes.
-- GitHub Actions enabled for the repository. The workflow requests `contents: write`; organization policies must permit release creation.
+- GitHub Actions enabled for the repository. The workflow requests `contents: write`; organization policies must permit updating and publishing the maintainer's release draft.
 - Microsoft Edge on Windows, or a Chromium browser configured through `BROWSER_PATH` for the browser tests. On macOS/Linux, set this to the actual browser executable.
 - A public repository for Community installation and anonymous release polling. An optional `GH_TOKEN` can authenticate polling if GitHub's anonymous API limit has been reached.
 
@@ -48,7 +62,7 @@ npm run release -- --no-wait
 
 `--dry-run` reads Git state and remote tags, then prints the plan. It changes no
 files or refs and does not run build checks. A version changed by a subsequent
-merge is recalculated during the real run. `--no-wait` exits after pushing;
+merge is recalculated during the real run. `--no-wait` exits after pushing and creating the draft;
 publication continues in Actions, and that command's success alone does not mean
 the release has been published.
 
@@ -57,7 +71,8 @@ the release has been published.
 - **Checks fail before tagging:** fix the issue and rerun `npm run release`. Version/changelog edits remain available for inspection.
 - **Merge conflicts:** the attempted merge is aborted. Your work is retained in a checkpoint commit. Merge `origin/main`, resolve the conflicts, commit, and rerun.
 - **Push fails after tagging:** keep the existing tag, resolve authentication or remote divergence, and use the resume command below if HEAD still matches the tag. A changed release commit needs a new version; the script does not move published tags.
-- **No release workflow starts:** open **Actions > Publish release > Run workflow**, leave the branch on `main`, and enter the existing tag (for example `0.1.0`). The recovery workflow checks out that exact tag and publishes its assets. Keep the tag unchanged. The script reports a missing workflow after three minutes rather than waiting the full timeout.
+- **Draft creation fails after pushing:** keep the tag and run the resume command as `hoelk-f` to create the missing draft. If the Action has already failed while waiting for the draft, rerun it after the draft exists. Draft lookup/API failures stop the script rather than treating an unreachable release as missing.
+- **No release workflow starts:** ensure the maintainer-owned draft exists, then open **Actions > Publish release > Run workflow**, leave the branch on `main`, and enter the existing tag (for example `0.1.0`). The recovery workflow checks out that exact tag and publishes its assets. Keep the tag unchanged. The script reports a missing workflow after three minutes rather than waiting the full timeout.
 - **Actions fails:** inspect the linked workflow run and use GitHub's **Re-run failed jobs** for transient errors. Source fixes require a new release version. Draft assets can be retried; existing public release assets are never overwritten.
 - **Polling times out:** the workflow may still succeed. Check Actions or resume waiting with the exact version:
 
@@ -66,7 +81,7 @@ npm run release -- 0.1.0 --resume
 ```
 
 Resume requires a clean working tree, HEAD matching the existing tag, and the
-same package version. It retries the atomic push and waits; it does not bump the
+same package version. It retries the atomic push, prepares a missing maintainer-owned draft, and waits; it does not bump the
 version, create another commit, or retrigger an already-pushed tag workflow.
 Waiting stops after 15 minutes. Test fixtures are isolated in the system temp
 folder and never contact the production repository.

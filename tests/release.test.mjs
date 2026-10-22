@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseArgs, chooseVersion, runRelease, waitForRelease } from '../scripts/release.mjs';
+import { parseArgs, chooseVersion, runRelease, waitForRelease, ensureReleaseDraft, MAINTAINER } from '../scripts/release.mjs';
 
 const json = file => JSON.parse(readFileSync(file, 'utf8'));
 function git(cwd, ...args) {
@@ -17,16 +17,33 @@ function fixture() {
   const remote = path.join(dir, 'remote.git'), root = path.join(dir, 'working');
   git(dir, 'init', '--bare', '--initial-branch=main', remote);
   git(dir, 'clone', remote, root);
-  git(root, 'config', 'user.name', 'Release test');
-  git(root, 'config', 'user.email', 'release-test@example.invalid');
+  git(root, 'config', 'user.name', MAINTAINER.name);
+  git(root, 'config', 'user.email', MAINTAINER.email);
   writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '0.1.0' }));
   writeFileSync(path.join(root, 'CHANGELOG.md'), '# Changelog\n\n## 0.1.0 — prepared for initial release\n\n- Initial features.\n');
   writeFileSync(path.join(root, 'sample.txt'), 'original\n');
   git(root, 'add', '--all'); git(root, 'commit', '-m', 'Initial'); git(root, 'push', 'origin', 'main');
   const initial = git(root, 'rev-parse', 'HEAD'), calls = [];
+  const github = { login: MAINTAINER.login, releases: new Map(), commands: [] };
   const io = {
     git: (...args) => git(root, ...args),
     gitRun: (...args) => git(root, ...args),
+    gh: (...args) => {
+      if (args[0] === 'api' && args[1] === 'user') return JSON.stringify({login: github.login});
+      if (args[0] === 'api' && args[1].includes('/releases?')) return JSON.stringify([[...github.releases.values()]]);
+      if (args[0] === 'release' && args[1] === 'view') {
+        const release = github.releases.get(args[2]);
+        return JSON.stringify({author: release.author, isDraft: release.draft});
+      }
+      throw new Error(`Unexpected GitHub read: ${args}`);
+    },
+    ghRun: (...args) => {
+      assert.equal(args[0], 'release'); assert.equal(args[1], 'create');
+      assert.ok(args.includes('--verify-tag') && args.includes('--draft'));
+      assert.equal(git(remote, 'rev-parse', `refs/tags/${args[2]}^{commit}`), git(root, 'rev-parse', 'HEAD'), 'A draft is created only after the matching tag is pushed');
+      github.commands.push(args);
+      github.releases.set(args[2], {tag_name: args[2], draft: true, author: {login: github.login}});
+    },
     isAncestor: (a, b) => spawnSync('git', ['merge-base', '--is-ancestor', a, b], {cwd: root}).status === 0,
     npm: (...args) => {
       calls.push(args);
@@ -41,7 +58,7 @@ function fixture() {
     assert.equal(git(remote, 'rev-parse', `refs/tags/${version}^{commit}`), sha);
     assert.equal(git(remote, 'rev-parse', 'refs/heads/main'), sha);
   }};
-  return {dir, remote, root, initial, calls, io, deps};
+  return {dir, remote, root, initial, calls, io, deps, github};
 }
 
 test('argument parsing and semantic version selection', () => {
@@ -71,6 +88,24 @@ test('dry run leaves local files, refs, index and remote unchanged', async () =>
   assert.equal(git(f.root, 'rev-parse', 'HEAD'), f.initial);
   assert.equal(git(f.remote, 'rev-parse', 'main'), f.initial);
   assert.equal(git(f.root, 'tag'), ''); assert.equal(f.calls.length, 0);
+  assert.equal(f.github.commands.length, 0, 'Preview never creates a release draft');
+});
+
+test('wrong GitHub account or effective Git identity stops before any changes', async () => {
+  for (const wrong of ['account', 'author', 'committer']) {
+    const f = fixture();
+    if (wrong === 'account') f.github.login = 'someone-else';
+    else {
+      const read = f.io.git;
+      f.io.git = (...args) => args[0] === 'var' && args[1] === `GIT_${wrong.toUpperCase()}_IDENT`
+        ? 'Unexpected <unexpected@example.invalid> 123456 +0000' : read(...args);
+    }
+    await assert.rejects(runRelease(parseArgs([]), f.deps), /Sign in|Configure this repository/);
+    assert.equal(git(f.root, 'rev-parse', 'HEAD'), f.initial);
+    assert.equal(git(f.remote, 'rev-parse', 'main'), f.initial);
+    assert.equal(git(f.root, 'status', '--porcelain'), '');
+    assert.equal(f.github.commands.length, 0); assert.equal(f.calls.length, 0);
+  }
 });
 
 test('first release and automatic patch include work and push matching annotated tag', async () => {
@@ -80,10 +115,41 @@ test('first release and automatic patch include work and push matching annotated
   assert.equal(git(f.root, 'cat-file', '-t', '0.1.0'), 'tag');
   assert.equal(git(f.remote, 'show', 'main:sample.txt'), 'ready');
   assert.equal(git(f.root, 'status', '--porcelain'), '');
+  assert.equal(git(f.root, 'log', '-1', '--format=%an <%ae>'), `${MAINTAINER.name} <${MAINTAINER.email}>`);
+  assert.equal(f.github.releases.get('0.1.0').author.login, 'hoelk-f');
   assert.deepEqual(f.calls.filter(args => args[0] === 'run').map(args => args[1]), ['lint', 'typecheck', 'test', 'test:release', 'test:browser', 'test:build', 'package:release']);
   assert.match(readFileSync(path.join(f.root, 'CHANGELOG.md'), 'utf8'), /## 0\.1\.0 — \d{4}-\d{2}-\d{2}/);
   assert.equal((await runRelease(parseArgs([]), f.deps)).version, '0.1.1');
   assert.equal(json(path.join(f.root, 'package.json')).version, '0.1.1');
+});
+
+test('draft creation failure preserves the pushed tag and resume creates exactly one maintainer draft', async () => {
+  const f = fixture(), create = f.io.ghRun;
+  f.io.ghRun = () => { throw new Error('GitHub unavailable'); };
+  await assert.rejects(runRelease(parseArgs([]), f.deps), /already pushed.*draft could not be prepared/);
+  const sha = git(f.remote, 'rev-parse', 'refs/tags/0.1.0^{commit}');
+  f.io.ghRun = create;
+  await runRelease(parseArgs(['0.1.0', '--resume']), f.deps);
+  await runRelease(parseArgs(['0.1.0', '--resume']), f.deps);
+  assert.equal(f.github.commands.length, 1);
+  assert.equal(git(f.remote, 'rev-parse', 'refs/tags/0.1.0^{commit}'), sha);
+});
+
+test('drafts from another account are rejected and existing public releases stay unchanged', () => {
+  const f = fixture();
+  const release = {tag_name: '0.1.0', draft: true, author: {login: 'github-actions[bot]'}};
+  f.github.releases.set('0.1.0', release);
+  assert.throws(() => ensureReleaseDraft('0.1.0', f.io), /belongs to github-actions\[bot\]/);
+  release.draft = false;
+  ensureReleaseDraft('0.1.0', f.io);
+  assert.equal(f.github.commands.length, 0);
+});
+
+test('release-list failures never trigger speculative draft creation', () => {
+  const f = fixture(), read = f.io.gh;
+  f.io.gh = (...args) => { if (args[1].includes('/releases?')) throw new Error('API unavailable'); return read(...args); };
+  assert.throws(() => ensureReleaseDraft('0.1.0', f.io), /API unavailable/);
+  assert.equal(f.github.commands.length, 0);
 });
 
 test('failed checks create no tag and push nothing', async () => {

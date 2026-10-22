@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const REPOSITORY = 'hoelk-f/remark-my-words';
+export const MAINTAINER = { login: 'hoelk-f', name: 'Florian Hölken', email: 'hoelken.florian@web.de' };
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const assets = ['main.js', 'manifest.json', 'styles.css'];
 const readJson = async file => JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
@@ -57,6 +58,8 @@ function runner(root) {
   return {
     git: (...args) => execute('git', args, true),
     gitRun: (...args) => execute('git', args),
+    gh: (...args) => execute('gh', args, true),
+    ghRun: (...args) => execute('gh', args),
     isAncestor: (first, second) => execute('git', ['merge-base', '--is-ancestor', first, second], false, [0, 1]) === 0,
     npm: (...args) => {
       const cli = process.env.npm_execpath;
@@ -65,6 +68,36 @@ function runner(root) {
     },
     log: message => console.log(message),
   };
+}
+
+export function assertReleaseIdentity(io) {
+  const account = JSON.parse(io.gh('api', 'user'));
+  if (account.login !== MAINTAINER.login) throw new Error(`Sign in to GitHub CLI as ${MAINTAINER.login} before releasing (current account: ${account.login}).`);
+  const expected = `${MAINTAINER.name} <${MAINTAINER.email}> `;
+  for (const field of ['GIT_AUTHOR_IDENT', 'GIT_COMMITTER_IDENT']) {
+    if (!io.git('var', field).startsWith(expected)) throw new Error(`Configure this repository's Git name/email as ${MAINTAINER.name} <${MAINTAINER.email}> and remove conflicting author/committer environment overrides before releasing.`);
+  }
+}
+
+export function ensureReleaseDraft(version, io) {
+  // Fetch the list with authentication: it includes drafts and does not confuse
+  // authentication/network failures with a release that does not exist.
+  const releases = JSON.parse(io.gh('api', `repos/${REPOSITORY}/releases?per_page=100`, '--paginate', '--slurp')).flat();
+  const release = releases.find(release => release.tag_name === version);
+  if (release) {
+    if (release.draft && release.author?.login !== MAINTAINER.login) throw new Error(`The draft for ${version} belongs to ${release.author?.login}, not ${MAINTAINER.login}. Keep the existing tag and correct the draft before retrying.`);
+    return;
+  }
+  assertReleaseIdentity(io);
+  io.ghRun('release', 'create', version, '--repo', REPOSITORY, '--verify-tag', '--draft', '--title', `Remark My Words ${version}`, '--generate-notes');
+  const created = JSON.parse(io.gh('release', 'view', version, '--repo', REPOSITORY, '--json', 'author,isDraft'));
+  if (!created.isDraft || created.author?.login !== MAINTAINER.login) throw new Error(`The release draft must belong to ${MAINTAINER.login}. Publication has not been confirmed.`);
+  io.log(`Release draft created by ${MAINTAINER.login}; GitHub Actions will verify and publish its assets.`);
+}
+
+function prepareReleaseDraft(version, io) {
+  try { ensureReleaseDraft(version, io); }
+  catch (error) { throw new Error(`The tag ${version} is already pushed, but its release draft could not be prepared. Keep the tag, fix the cause, and run npm run release -- ${version} --resume. ${error.message}`); }
 }
 
 async function assertNoOperation(root, io) {
@@ -135,6 +168,7 @@ export async function runRelease(options, { root = fileURLToPath(new URL('../', 
   if (!accepted) throw new Error(`Unexpected origin: ${remote}. Expected the Remark My Words repository.`);
   await assertNoOperation(root, io);
   if (!io.git('config', 'user.name') || !io.git('config', 'user.email')) throw new Error('Configure Git user.name and user.email first.');
+  assertReleaseIdentity(io);
   const refs = io.git('ls-remote', '--tags', 'origin');
   const remoteTags = new Set([...refs.matchAll(/refs\/tags\/([^\s^]+)(?:\^\{\})?/g)].map(match => match[1]));
   const pkg = await readJson(path.join(root, 'package.json'));
@@ -142,7 +176,7 @@ export async function runRelease(options, { root = fileURLToPath(new URL('../', 
   io.log(`Release ${version} to ${REPOSITORY}. All non-ignored working changes will be included.`);
   if (options.dryRun) {
     io.log(io.git('status', '--short', '--untracked-files=normal'));
-    io.log('Plan: fetch -> checkpoint local changes if needed -> merge origin/main -> sync version/changelog -> npm ci -> typecheck/tests/browser tests/build -> commit -> annotated tag -> atomic push of main and tag -> automatic GitHub publication.');
+    io.log('Plan: verify hoelk-f Git/CLI identity -> fetch -> checkpoint local changes if needed -> merge origin/main -> sync version/changelog -> npm ci -> typecheck/tests/browser tests/build -> commit -> annotated tag -> atomic push of main and tag -> create draft as hoelk-f -> automatic verified publication.');
     io.log('Dry run finished. No files, commits, tags, or remote refs were changed.');
     return { version, dryRun: true };
   }
@@ -153,6 +187,7 @@ export async function runRelease(options, { root = fileURLToPath(new URL('../', 
     const head = io.git('rev-parse', 'HEAD');
     if (io.git('rev-parse', `refs/tags/${version}^{commit}`) !== head || pkg.version !== version) throw new Error('Resume requires HEAD and package.json to match the existing release tag.');
     io.gitRun('push', '--atomic', 'origin', 'HEAD:refs/heads/main', `refs/tags/${version}:refs/tags/${version}`);
+    prepareReleaseDraft(version, io);
     if (options.wait) await wait(version, head);
     return { version, resumed: true };
   }
@@ -177,6 +212,7 @@ export async function runRelease(options, { root = fileURLToPath(new URL('../', 
   io.npm('ci', '--no-audit', '--no-fund');
   for (const script of ['lint', 'typecheck', 'test', 'test:release', 'test:browser', 'test:build', 'package:release']) io.npm('run', script);
   io.gitRun('add', '--all');
+  assertReleaseIdentity(io);
   if (io.git('diff', '--cached', '--name-only')) io.gitRun('commit', '-m', `Release ${version}`);
   const sha = io.git('rev-parse', 'HEAD');
   io.gitRun('tag', '-a', version, '-m', `Remark My Words ${version}`);
@@ -187,6 +223,7 @@ export async function runRelease(options, { root = fileURLToPath(new URL('../', 
     throw new Error(`Push failed. The local commit and tag ${version} were kept. Resolve the push problem, then run npm run release -- ${version} --resume. ${error.message}`);
   }
   io.log(`Pushed ${version}. Workflow: https://github.com/${REPOSITORY}/actions/workflows/release.yml`);
+  prepareReleaseDraft(version, io);
   if (options.wait) await wait(version, sha);
   return { version, sha };
 }
@@ -194,7 +231,7 @@ export async function runRelease(options, { root = fileURLToPath(new URL('../', 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const options = parseArgs(process.argv.slice(2), process.env);
-    if (options.help) console.log(`Preview: npm run release:preview\nUsage: npm run release -- [auto|current|patch|minor|major|x.y.z] [--dry-run] [--no-wait]\n       npm run release -- x.y.z --resume\n\nDefault: publish the current version if unreleased, otherwise bump patch.\nIncludes all non-ignored changes, creates commits/tags, pushes, and publishes via GitHub Actions.\nRequires Node 22+, Git push access, and a Chromium browser for the existing browser tests.\n--dry-run previews without mutations; --resume retries a push or waits for an existing tag.`);
+    if (options.help) console.log(`Preview: npm run release:preview\nUsage: npm run release -- [auto|current|patch|minor|major|x.y.z] [--dry-run] [--no-wait]\n       npm run release -- x.y.z --resume\n\nDefault: publish the current version if unreleased, otherwise bump patch.\nIncludes all non-ignored changes, creates commits/tags, pushes, creates a draft as hoelk-f, and publishes via GitHub Actions.\nRequires Node 22+, GitHub CLI signed in as hoelk-f, the maintainer Git identity, Git push access, and a Chromium browser.\n--dry-run previews without mutations; --resume retries a push, prepares a missing draft, or waits for an existing tag.`);
     else await runRelease(options);
   } catch (error) { console.error(`\nRelease stopped: ${error.message}`); process.exitCode = 1; }
 }

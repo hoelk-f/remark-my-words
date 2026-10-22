@@ -62,15 +62,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" --json isDraft > release-state.json; then
-            if jq -e '.isDraft == false' release-state.json > /dev/null; then
-              echo "Release is already public; published assets will not be overwritten."
-              exit 0
+          # The maintainer's local release command creates the draft. Never
+          # create a bot-owned release when that step is delayed or fails.
+          found=false
+          for attempt in {1..12}; do
+            if gh release view "$RELEASE_TAG" --json author,isDraft > release-state.json; then
+              found=true
+              break
             fi
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --draft \
-              --title "Remark My Words $RELEASE_TAG" --generate-notes
+            sleep 5
+          done
+          if [ "$found" != true ]; then
+            echo "Missing release draft. Run npm run release -- $RELEASE_TAG --resume as hoelk-f, then rerun this workflow."
+            exit 1
           fi
+          if jq -e '.isDraft == false' release-state.json > /dev/null; then
+            echo "Release is already public; published assets will not be overwritten."
+            exit 0
+          fi
+          jq -e '.author.login == "hoelk-f"' release-state.json > /dev/null || {
+            echo "Only a draft created by hoelk-f may be published."
+            exit 1
+          }
           gh release upload "$RELEASE_TAG" \
             dist/remark-my-words/main.js \
             dist/remark-my-words/manifest.json \
