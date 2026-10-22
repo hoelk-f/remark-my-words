@@ -42,12 +42,13 @@ The PDF renderer is bundled with the plugin, so no additional download is needed
 3. Choose **Reading mode** for one page at a time or **Canvas mode** for the whole document. Canvas initially fits the first page; **Fit PDF and comments** opens the full overview. Returning from Reading restores your previous Canvas camera. Both modes support passage selection and comments.
 4. Select text, click a category in the floating toolbar, and fill in **Add comment**. Right-clicking selected text also offers categories.
 5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. **Read page comments** opens a dockable right sidebar that follows page navigation and supports editing and deletion.
-6. In Canvas, drag a page by its title bar or a comment by its header. Shift-click to select several items, or drag a selection rectangle on the background. On touchscreens, enable **Select multiple items** and tap the items. Group the selection from the toolbar or right-click menu. Drag the group title to move its members together. The page thumbnails on the left jump to each page's current position. **Rearrange pages and comments** stacks pages vertically with comments on both sides, calculating spacing from their heights and preserving groups.
+6. In Canvas, click to select one item; Ctrl/⌘-click or Shift-click adds or removes items. Drag a page by its title bar or a comment by its header; dragging a selected item moves the whole selection. Drag a selection rectangle on the background, holding Ctrl/⌘ or Shift to extend the selection. On touchscreens, enable **Select multiple items** and tap the items. Group the selection from **Canvas actions** or the right-click menu. Drag the group title to move its members together. The page thumbnails on the left jump to each page's current position. **Rearrange pages and comments** stacks pages vertically with comments on both sides, calculating spacing from their heights and preserving groups.
 
 Canvas uses the same PDF text layers, highlights, comments, and passage connections
 as Reading. Right-click opens Obsidian menus for the page, comment, group, or
-background. The **Canvas actions** toolbar menu also exposes these layout actions
-on touchscreens. **Undo/Redo canvas change** restores layout operations; **Snap to grid
+background. The **Canvas actions** toolbar menu provides grouping and selection
+actions on touchscreens. **Undo/Redo canvas change**, next to page navigation,
+restores layout operations; **Snap to grid
 and objects** enables alignment, with Alt temporarily bypassing it while dragging.
 Double-click a group title to rename it; **Ungroup selection** keeps its members.
 
@@ -119,6 +120,29 @@ or use the hand tool to pan with one finger.
 | Ctrl/⌘ + Z / Shift + Z | Undo / redo Canvas layout changes |
 | Enter on a focused card | Edit the comment |
 | Ctrl/⌘ + Enter in the description field | Save the comment |
+
+## Export selected comments
+
+In Canvas, select one or more comments, pages, or groups, then choose
+**Export selection…** from **Canvas actions** or the right-click menu.
+Use **Select all pages and comments** first to include the entire document's comments.
+A selected page includes every comment on that page, including comments hidden
+by category filters. Selecting both a page and one of its comments exports that
+comment once. The dialog shows the number of comments and pages in the selection.
+
+Choose one combined Markdown file (organized by PDF page, with a heading for each
+comment) or one Markdown file per comment. Exports include titles, quotes,
+comment text, category labels, tags, a link to the PDF page, and a link back to the
+original comment in Remark My Words. General document notes are optional; in
+individual-file mode they get their own file. The folder defaults to a new notes
+folder next to the PDF; leave the folder field empty to use the vault root.
+
+Existing notes are never overwritten: repeated exports and duplicate names get
+numbered file names. If writing fails partway through, **Retry export** continues
+with the remaining files while the dialog is open. Canceling after a partial
+export keeps the files already created. Exports are independent snapshots;
+editing them does not update the PDF comments. The PDF and annotation sidecar
+remain unchanged. Exported Markdown notes can be added to a native Obsidian Canvas.
 
 ## Current limits
 

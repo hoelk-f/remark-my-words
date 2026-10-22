@@ -34,7 +34,7 @@ export class CategoryModal extends Modal {
     categories.createEl("p", { cls: "pdfaw-category-help", text: "Create, edit, or reorder categories. The order is used in comment menus, filters, and the selection toolbar." });
     this.list = categories.createDiv({ cls: "pdfaw-category-list" });
     this.error = this.contentEl.createDiv({ cls: "pdfaw-category-error", attr: { role: "alert", tabindex: "-1" } });
-    this.add = categories.createEl("button", { text: "Add category", attr: { type: "button" } });
+    this.add = categories.createEl("button", { cls: "pdfaw-category-add", text: "Add category", attr: { type: "button" } });
     this.add.onclick = () => {
       if (this.saving) return;
       const item: CategoryDefinition = { id: `custom-${crypto.randomUUID()}`, label: "", color: "#54b5ff", hex: "#54b5ff", icon: "tag" };

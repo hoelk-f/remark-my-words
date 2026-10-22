@@ -145,6 +145,15 @@
 .pdfaw-category-settings h3 { margin: 0 0 4px; }
 .pdfaw-category-settings > p { margin: 0 0 10px; }
 .pdfaw-category-list { padding: 2px; }
+.pdfaw-category-add { margin-top: 16px; }
+.pdfaw-export-field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.pdfaw-export-field[hidden] { display: none; }
+.pdfaw-export-field :is(input, select) { width: 100%; min-width: 0; }
+.pdfaw-export-notes-label { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
+.pdfaw-export-notes-label input { flex-shrink: 0; }
+.pdfaw-export-hint { color: var(--pdfaw-muted); }
+.pdfaw-export-error { color: var(--text-error); overflow-wrap: anywhere; }
+.pdfaw-export-status { overflow-wrap: anywhere; }
 .pdfaw-category-row { display: grid; grid-template-columns: 24px minmax(100px, 1fr) 56px minmax(100px, 120px) 32px 32px; gap: 10px; align-items: end; padding: 14px 0; border-bottom: 1px solid var(--pdfaw-border); }
 .pdfaw-category-row label { display: block; margin-bottom: 6px; color: var(--pdfaw-muted); font-size: var(--font-ui-small); }
 .pdfaw-category-row input[type="text"], .pdfaw-category-row select { width: 100%; min-width: 0; }

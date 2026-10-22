@@ -1,6 +1,7 @@
 import {fixturePdf, complexPdf} from "./pdf-fixtures.mjs";
 import { testPerformance } from "./performance-browser.mjs";
 import { testBoard } from "./board-browser.mjs";
+import { testExport } from "./export-browser.mjs";
 import { testCategories } from "./category-browser.mjs";
 import { testRendering } from "./rendering-browser.mjs";
 import { testTouch } from "./touch-browser.mjs";
@@ -336,6 +337,7 @@ try {
   await evaluate('document.querySelector(".test-sidebar").style.display="none"');
   await testPerformance({evaluate, until, cdp}, process.env.PERF_BASELINE === "1");
   await testBoard({evaluate, until, cdp});
+  await testExport({evaluate, until, cdp});
   await testCategories({evaluate, until, cdp});
   await testRendering({evaluate, until, cdp});
   await testTouch({evaluate, until, cdp});

@@ -26,7 +26,7 @@ export class PdfSidebar extends ItemView {
     if (this.type === PAGES_VIEW) {
       const actions = root.createDiv({ cls: "pdfaw-sidebar-actions" });
       if (context.read) this.action(actions, "book-open", "Read and annotate PDF", context.read);
-      if (context.rearrange) this.action(actions, "layout-dashboard", "Rearrange pages and comments", context.rearrange);
+      if (context.rearrange) this.action(actions, "layout-list", "Rearrange pages and comments", context.rearrange);
       if (context.refresh) this.action(actions, "refresh-cw", "Refresh comments from PDF", context.refresh);
       const list = root.createDiv({ cls: "pdfaw-sidebar-pages", attr: { "aria-label": "PDF pages" } });
       for (let page = 1; page <= context.pages; page++) {

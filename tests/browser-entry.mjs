@@ -1,5 +1,5 @@
 import RemarkMyWordsPlugin, { PdfAnnotatorView } from '../src/main.ts';
-import { TFile } from './obsidian-mock.mjs';
+import { TFile, TFolder } from './obsidian-mock.mjs';
 const storage = new Map();
 const files = new Map();
 const sideLeaves = [];
@@ -14,9 +14,11 @@ const app = { vault: {
   getFiles: () => [new TFile('Forschungspapier.pdf'), new TFile('note.md')],
   getName: () => 'Test vault',
   getAbstractFileByPath: path => files.get(path),
+  getAllLoadedFiles: () => [...files.values()],
   read: async file => storage.get(file.path),
   readBinary: async file => (await fetch(file.path==='Long.pdf'?'/long-fixture.pdf':file.path==='Complex.pdf'?'/complex-fixture.pdf':'/fixture.pdf')).arrayBuffer(),
-  create: async (path, data) => { storage.set(path, data); const file=new TFile(path);files.set(path, file);return file; },
+  create: async (path, data) => { if (files.has(path)) throw new Error('File already exists'); if (path.endsWith('.md') && window.failExportAfter === 0) throw new Error('Export disk unavailable'); if (path.endsWith('.md') && window.failExportAfter > 0) window.failExportAfter--; storage.set(path, data); const file=new TFile(path);files.set(path, file);return file; },
+  createFolder: async path => { if (files.has(path)) throw new Error('Folder already exists'); const folder=new TFolder(path); files.set(path,folder); return folder; },
   modify: async (file, data) => { storage.set(file.path, data); },
   process: async (file, fn) => { const data=fn(storage.get(file.path));storage.set(file.path,data);return data; },
 }, workspace: { getActiveFile: () => window.activeFile ?? null, getLeaf: () => ({setViewState: async state => { window.openedState = state; }}), on: () => ({}),

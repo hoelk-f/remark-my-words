@@ -106,7 +106,7 @@ export async function testTouch({ evaluate, until, cdp }) {
       await send('touchStart',[point]); await send('touchEnd');
     }
     assert.equal(await evaluate('view.expandedSelection().size'),2,'Touch selection can select multiple PDF pages without a keyboard');
-    await evaluate(`document.querySelector('button[aria-label="Group selection"]').click();document.querySelector('.pdfaw-group-name').value='Touch group';[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click()`);
+    await evaluate(`document.querySelector('button[aria-label="Canvas actions"]').click();lastMenu.items.find(item=>item.text==='Group selection').action();document.querySelector('.pdfaw-group-name').value='Touch group';[...document.querySelectorAll('.modal button')].find(b=>b.textContent==='Save').click()`);
     assert.equal(await evaluate('view.layout.groups.at(-1).name'),'Touch group');
     assert.equal(await evaluate('view.multiSelect'),false,'Creating a group returns to normal dragging');
     await evaluate(`document.querySelector('button[aria-label="Canvas actions"]').click()`);

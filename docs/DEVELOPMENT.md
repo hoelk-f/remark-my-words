@@ -26,6 +26,8 @@ installable files into `dist/remark-my-words/`. No npm publication is needed.
 - `src/comment-preview.ts`: Reading-mode previews.
 - `src/sidebar.ts`: dockable page navigation and page comments.
 - `src/board-model.ts`: layout validation, migration, spacing, snapping, and layout history.
+- `src/markdown-export.ts`: selection resolution, Markdown serialization, safe names, and resumable vault writes.
+- `src/export-modal.ts`: export format, destination, optional document notes, progress, and retry.
 - `src/pdf-pages.ts`: shared multipage surfaces with lazy raster and text-layer rendering.
 - `styles.css`: plugin-scoped styles.
 - `scripts/pdf-worker-plugin.mjs`: embeds the matching PDF.js worker as text at build time.
@@ -74,7 +76,11 @@ with page positions independent from comment positions. The title bar moves a
 page without intercepting native passage selection. Page navigation centers on
 the stored page position, and connections add that origin to page-local quads.
 
-Selection supports Shift-click and a background marquee. Groups contain stable
+Selection supports Ctrl/Command/Shift-click and an additive background marquee.
+A plain click selects one item; dragging a selected handle retains the whole
+selection, with a small movement threshold to distinguish clicks from drags.
+The toolbar menu contains selection/group actions, while context menus also
+include the operations available as direct toolbar buttons. Groups contain stable
 `p:<page>` and `a:<annotation-id>` keys; dragging a group moves members by a shared
 delta. Group frames follow their contents. Rearrange uses actual card heights and
 PDF page sizes, keeps group membership, and spaces the next page after the taller
@@ -89,6 +95,29 @@ iOS/Android. These host flows were exercised in Obsidian 1.14.4 on Linux for
 0.4.0 and 0.4.1. The browser suite also tests a 120-page PDF and touch grouping.
 Old `.remark.canvas` files are never read, updated, or removed by the
 unified view. The protocol handler remains available for their source links.
+
+## Markdown export
+
+Selection resolves from annotation records and group membership, not mounted
+cards. Selected page keys include all annotations on the page; selected cards,
+pages, and groups are deduplicated and sorted by PDF page and passage position.
+The dialog takes a snapshot of comments, category labels, and document notes on
+opening. It writes only new Markdown files through public Vault APIs, including
+on mobile, without changing the PDF or sidecar.
+
+Combined exports use page headings and disambiguated comment headings. Individual
+exports derive portable names from page numbers and titles. Quotes escape Markdown
+and HTML; comment/document-note bodies retain user-authored Markdown. Source links
+use encoded relative PDF paths with page fragments and encoded plugin protocol
+links. Document notes are opt-in and get a separate file in individual mode.
+
+Destinations must be visible folders inside the vault. Existing names, including
+case-insensitive matches, receive numeric suffixes; the exporter only calls create,
+never modify. A failed job retains its completed paths and retries only the
+remaining files. Closing a partially completed job leaves exported files in place.
+Unit tests cover serialization, selection, collisions, and partial failures;
+browser tests exercise both formats, filters, groups, cancellation, retry, source
+preservation, and the export dialog on a narrow touchscreen.
 
 ## Large-document performance
 

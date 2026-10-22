@@ -32,6 +32,44 @@ export async function testBoard({evaluate,until,cdp}) {
   await mouse('mousePressed',area.x+5,area.y+55);await mouse('mouseMoved',area.x+area.w-5,area.y+area.h-5);await mouse('mouseReleased',area.x+area.w-5,area.y+area.h-5);
   assert.equal(await evaluate('view.expandedSelection().size'),await evaluate('view.sidecar.annotations.length+2'),'Marquee selects pages and comments');
   await key('Escape');
+  const page1 = '.pdfaw-page-node[data-page="1"] .pdfaw-page-handle';
+  const page2 = '.pdfaw-page-node[data-page="2"] .pdfaw-page-handle';
+  const card = '.pdfaw-comment-card .pdfaw-card-header';
+  await drag(page1,0,0);
+  await drag(page2,0,0,2);
+  assert.deepEqual(await evaluate('[...view.selectedNodes].sort()'),['p:1','p:2'],'Ctrl-click adds a second page');
+  await drag(page1,0,0,2);
+  assert.deepEqual(await evaluate('[...view.selectedNodes]'),['p:2'],'Ctrl-click removes a selected page without selecting it again on focus');
+  await drag(card,0,0,4);
+  assert.equal(await evaluate('view.expandedSelection().size'),2,'Command-click adds a comment');
+  await drag('.pdfaw-comment-card h3',0,0,4);
+  assert.deepEqual(await evaluate('[...view.selectedNodes]'),['p:2'],'Command-click on the comment body removes it without a focus-driven reselect');
+  await drag('.pdfaw-page-node[data-page="1"] .pdfaw-page',0,0,2);
+  assert.deepEqual(await evaluate('[...view.selectedNodes].sort()'),['p:1','p:2'],'Ctrl-click works on the PDF body while leaving text selection available without modifiers');
+  const selectedBefore=await evaluate('({pages:structuredClone(view.layout.pages),zoom:view.camera.zoom})');
+  await drag(page1,30,15);
+  for (const page of [1,2]) {
+    const position=await evaluate(`view.layout.pages[${page}]`);
+    assert.ok(Math.abs(position.x-selectedBefore.pages[page].x-30/selectedBefore.zoom)<1 && Math.abs(position.y-selectedBefore.pages[page].y-15/selectedBefore.zoom)<1,'Dragging a selected page preserves and moves the complete selection');
+  }
+  await key('z',2);
+  await drag(page1,0,0); await drag(page2,0,0,2); await drag(page1,0,0);
+  assert.deepEqual(await evaluate('[...view.selectedNodes]'),['p:1'],'A plain click collapses a multiple selection to the clicked item');
+  await drag(page2,0,0);
+  const box=await evaluate(`(() => {const r=document.querySelector('.pdfaw-comment-card').getBoundingClientRect();return {x:r.left-4,y:r.top-4,right:r.right+4,bottom:r.bottom+4};})()`);
+  await mouse('mousePressed',box.x,box.y,2); await mouse('mouseMoved',box.right,box.bottom,2); await mouse('mouseReleased',box.right,box.bottom,2);
+  assert.equal(await evaluate('view.selectedNodes.has("p:2") && view.selectedNodes.has("a:"+view.sidecar.annotations[0].id)'),true,'Ctrl-marquee adds comments while retaining the previous page selection');
+  await evaluate(`document.querySelector('button[aria-label="Canvas actions"]').click()`);
+  assert.deepEqual(await evaluate('lastMenu.items.map(item=>item.text)'),['Group selection','Ungroup selection','Select all pages and comments','Export selection…'],'Canvas actions keeps selection operations without duplicating direct toolbar controls');
+  assert.equal(await evaluate(`lastMenu.items.find(item=>item.text==='Group selection').disabled`),false,'Grouping remains available for the selection');
+  await evaluate(`lastMenu.items.find(item=>item.text==='Select all pages and comments').action()`);
+  assert.equal(await evaluate('view.expandedSelection().size'),await evaluate('view.sidecar.annotations.length+2'),'Select all remains available from the toolbar menu');
+  for (const selector of ['.pdfaw-viewport', '.pdfaw-page-node[data-page="1"]', '.pdfaw-comment-card']) {
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:500,clientY:400}))`);
+    assert.ok(await evaluate(`lastMenu.items.find(item=>item.text==='Select all pages and comments')?.icon`),'Select all has an icon in each context menu');
+    assert.ok(await evaluate(`lastMenu.items.some(item=>item.text==='Undo canvas change') && lastMenu.items.some(item=>item.text==='Rearrange pages and comments')`),'Context menus retain direct layout actions');
+  }
+  await key('Escape');
   await drag('.pdfaw-page-node[data-page="1"] .pdfaw-page-handle',0,0);
   await drag('.pdfaw-comment-card .pdfaw-card-header',0,0,8);
   assert.equal(await evaluate('view.expandedSelection().size'),2,'Shift-click adds a card to the page selection');
@@ -79,5 +117,5 @@ export async function testBoard({evaluate,until,cdp}) {
   assert.ok(await evaluate('[...view.pages.surfaces.values()].reduce((n,s)=>n+(s.canvas?s.canvas.width*s.canvas.height:0),0)<34000000'),'Overview stays within the bitmap budget');
   assert.ok(await evaluate('(() => {const p=view.pages.surfaces.get(120).body.getBoundingClientRect(),v=view.viewport.getBoundingClientRect();return p.bottom<=v.bottom && view.pages.surfaces.get(1).body.getBoundingClientRect().top>=v.top;})()'), 'Fit includes the first and last pages even in a long PDF');
   await evaluate('view.onLoadFile(new TFile("Forschungspapier.pdf"))');
-  console.log('PASS: one multi-page canvas, page dragging, page-local highlights, sidebar navigation, marquee/Shift selection, groups, native menus, layout history, persistence and lazy raster eviction');
+  console.log('PASS: one multi-page canvas, page dragging, page-local highlights, sidebar navigation, Ctrl/Command/Shift selection, additive marquee, selection dragging, groups, native menus, layout history, persistence and lazy raster eviction');
 }

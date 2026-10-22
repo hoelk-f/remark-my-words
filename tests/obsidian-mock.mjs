@@ -19,6 +19,7 @@ Object.assign(Element.prototype, {
   toggleClass(name, value) { this.classList.toggle(name, value); }, hasClass(name) { return this.classList.contains(name); },
 });
 export class TFile { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.extension = path.split('.').at(-1); } }
+export class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; } }
 export class FileView {
   constructor(leaf) { this.leaf = leaf; this.app = leaf.app; this.contentEl = document.querySelector('#app'); this.cleanups = []; }
   register(fn) { this.cleanups.push(fn); }
@@ -47,7 +48,7 @@ export class Notice { constructor(text) { (window.notices ??= []).push(text); } 
 export function setIcon(el, name) { el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M9 9h6M9 13h6"/></svg>'; el.dataset.icon = name; }
 export class Menu {
   constructor() { this.items = []; }
-  addItem(fn) { const item = { setTitle(text) { this.text = text; return this; }, setIcon() { return this; }, setDisabled(value) { this.disabled=value; return this; }, setChecked() { return this; }, onClick(action) { this.action = action; return this; } }; fn(item); this.items.push(item); return this; }
+  addItem(fn) { const item = { setTitle(text) { this.text = text; return this; }, setIcon(icon) { this.icon = icon; return this; }, setDisabled(value) { this.disabled=value; return this; }, setChecked() { return this; }, onClick(action) { this.action = action; return this; } }; fn(item); this.items.push(item); return this; }
   addSeparator() { return this; }
   showAtPosition() { window.lastMenu = this; }
   showAtMouseEvent() { window.lastMenu = this; }

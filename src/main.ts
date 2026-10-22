@@ -3,6 +3,8 @@ import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFDocumentLoadingTask, RenderTask } from "pdfjs-dist";
 import { Annotation, Bounds, CARD_WIDTH, Category, Point, Quad, Sidecar, connection, defaultPosition, fitCamera, readSidecar } from "./model";
 import { CommentDraft, CommentModal } from "./editor";
+import { ExportModal } from "./export-modal";
+import { selectedComments } from "./markdown-export";
 import { selectionQuads } from "./selection";
 import { CommentPreview } from "./comment-preview";
 import { CategoryStore, readCategorySettings, readThemeColors } from "./category-store";
@@ -89,7 +91,7 @@ export class PdfAnnotatorView extends FileView {
   private selectionBarPosition: Point | null = null;
   private selectionDrag: { pointer: number; start: Point; origin: Point } | null = null;
   private activeId: string | null = null;
-  private gesture: { pointer: number; start: Point; origin: Point; element: HTMLElement; nodes?: Map<string, Point>; before?: BoardLayout; marquee?: Point; additive?: Set<string> } | null = null;
+  private gesture: { pointer: number; start: Point; origin: Point; element: HTMLElement; nodes?: Map<string, Point>; nodeKey?: string; moved?: boolean; before?: BoardLayout; marquee?: Point; additive?: Set<string> } | null = null;
   private selectedNodes = new Set<string>();
   private multiSelect = false;
   private multiSelectButton!: HTMLButtonElement;
@@ -149,17 +151,16 @@ export class PdfAnnotatorView extends FileView {
     navigation.createSpan({ text: "/", attr: { "aria-hidden": "true" } });
     this.pageTotal = navigation.createSpan({ cls: "pdfaw-page-total", text: "0" });
     this.button(navigation, "chevron-right", "Next page", () => void this.showPage(this.currentPage + 1));
+    this.undoButton = this.button(navigation, "undo-2", "Undo canvas change", () => this.restoreLayout(false), "pdfaw-canvas-control");
+    this.redoButton = this.button(navigation, "redo-2", "Redo canvas change", () => this.restoreLayout(true), "pdfaw-canvas-control");
     const right = toolbar.createDiv({ cls: "pdfaw-tool-group pdfaw-toolbar-end" });
     this.button(right, "messages-square", "Read page comments", () => {
       this.updateSidebar(); void this.sidebars.show(COMMENTS_VIEW);
     }, "pdfaw-read-comments");
-    this.button(right, "layout-dashboard", "Rearrange pages and comments", () => { void this.rearrangeCards(); }, "pdfaw-canvas-control");
-    this.undoButton = this.button(right, "undo-2", "Undo canvas change", () => this.restoreLayout(false), "pdfaw-canvas-control");
-    this.redoButton = this.button(right, "redo-2", "Redo canvas change", () => this.restoreLayout(true), "pdfaw-canvas-control");
+    this.button(right, "layout-list", "Rearrange pages and comments", () => { void this.rearrangeCards(); }, "pdfaw-canvas-control");
     this.snapButton = this.button(right, "magnet", "Snap to grid and objects", () => this.toggleSnap(), "pdfaw-canvas-control");
     this.multiSelectButton = this.button(right, "list-checks", "Select multiple items", () => { this.multiSelect = !this.multiSelect; this.updateSelectionPaint(); }, "pdfaw-canvas-control");
-    const canvasActions = this.button(right, "ellipsis", "Canvas actions", () => { if (!this.sidecar) return; const menu = new Menu(); this.addLayoutMenu(menu); menu.showAtPosition(this.menuPosition(canvasActions)); }, "pdfaw-canvas-control");
-    this.button(right, "group", "Group selection", () => this.groupSelection(), "pdfaw-canvas-control");
+    const canvasActions = this.button(right, "ellipsis", "Canvas actions", () => { if (!this.sidecar) return; const menu = new Menu(); this.addLayoutMenu(menu, true); menu.showAtPosition(this.menuPosition(canvasActions)); }, "pdfaw-canvas-control");
     this.button(right, "settings", "Customize", () => new CategoryModal(this.app, this.categories).open());
     this.button(right, "sticky-note", "Document notes", () => {
       this.root.toggleClass("pdfaw-show-notes", !this.root.hasClass("pdfaw-show-notes"));
@@ -220,7 +221,11 @@ export class PdfAnnotatorView extends FileView {
       const page = (event.target as HTMLElement).closest<HTMLElement>(".pdfaw-page");
       if (!page) return;
       this.activatePage(Number(page.dataset.page));
-      if (this.mode === "canvas" && (event.shiftKey || this.multiSelect) && event.button === 0) { this.selectNode(pageKey(this.currentPage), true); event.preventDefault(); return; }
+      if (this.mode === "canvas" && this.tool === "select" && event.button === 0) {
+        const additive = this.extendsSelection(event);
+        this.selectNode(pageKey(this.currentPage), additive);
+        if (additive) { event.preventDefault(); this.clearSelection(); this.win.getSelection()?.removeAllRanges(); this.root.focus(); return; }
+      }
       if (event.button === 0 && this.tool === "select" && this.pageReady) this.selectionPointer = event.pointerId;
       this.commentPress = this.mode === "reading" && event.button === 0
         ? { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, dragged: false } : null;
@@ -314,7 +319,7 @@ export class PdfAnnotatorView extends FileView {
   private installPage(surface: PageSurface) {
     surface.header.onpointerdown = event => this.startNodeDrag(event, pageKey(surface.number), surface.header);
     surface.header.onfocus = () => { this.activatePage(surface.number); this.selectNode(pageKey(surface.number), false, true); };
-    surface.header.ondblclick = () => { this.activatePage(surface.number); this.setMode("reading"); };
+    surface.header.ondblclick = event => { if (!this.extendsSelection(event)) { this.activatePage(surface.number); this.setMode("reading"); } };
   }
   private nodeBounds(): Map<string, Bounds> {
     const boxes = new Map<string, Bounds>();
@@ -349,7 +354,7 @@ export class PdfAnnotatorView extends FileView {
         el = this.groupsEl.createDiv({ cls: "pdfaw-group", attr: { "data-node": `g:${group.id}` } });
         const header = el.createDiv({ cls: "pdfaw-group-handle", attr: { tabindex: "0" } });
         header.onpointerdown = event => this.startNodeDrag(event, `g:${group.id}`, header);
-        header.ondblclick = () => this.renameGroup(group.id);
+        header.ondblclick = event => { if (!this.extendsSelection(event)) this.renameGroup(group.id); };
         this.groupElements.set(group.id, el);
       }
       if (el.firstElementChild!.textContent !== group.name) el.firstElementChild!.textContent = group.name;
@@ -377,6 +382,7 @@ export class PdfAnnotatorView extends FileView {
     }
     const boxes = this.nodeBounds(); return new Set([...keys].filter(key => boxes.has(key)));
   }
+  private extendsSelection(event: MouseEvent) { return event.ctrlKey || event.metaKey || event.shiftKey || this.multiSelect; }
   private selectNode(key: string, additive = false, preserve = false) {
     if (additive) { if (this.selectedNodes.has(key)) this.selectedNodes.delete(key); else this.selectedNodes.add(key); }
     else if (!preserve || !this.expandedSelection().has(key) && !this.selectedNodes.has(key)) this.selectedNodes = new Set([key]);
@@ -392,13 +398,15 @@ export class PdfAnnotatorView extends FileView {
   }
   private startNodeDrag(event: PointerEvent, key: string, element: HTMLElement) {
     if (event.button !== 0 || this.mode !== "canvas" || this.tool !== "select" || this.pinchActive) return;
-    event.preventDefault(); event.stopPropagation(); this.selectNode(key, event.shiftKey || this.multiSelect, true);
-    if (event.shiftKey || this.multiSelect) { this.root.focus(); return; }
-    element.focus();
+    event.preventDefault(); event.stopPropagation();
+    const additive = this.extendsSelection(event);
+    this.selectNode(key, additive, true);
     this.clearSelection(); this.win.getSelection()?.removeAllRanges();
+    if (additive) { this.root.focus(); return; }
+    element.focus();
     const boxes = this.nodeBounds(), nodes = new Map<string, Point>();
     for (const member of this.expandedSelection()) { const box = boxes.get(member)!; nodes.set(member, { x: box.x, y: box.y }); }
-    this.gesture = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { x: 0, y: 0 }, element, nodes, before: structuredClone(this.layout) };
+    this.gesture = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { x: 0, y: 0 }, element, nodes, nodeKey: key, before: structuredClone(this.layout) };
     element.setPointerCapture(event.pointerId);
   }
   private focusPage(number: number) {
@@ -439,19 +447,30 @@ export class PdfAnnotatorView extends FileView {
     this.layout.groups = this.layout.groups.filter(g => !this.selectedNodes.has(`g:${g.id}`) && !g.members.every(key => members.has(key)));
     this.selectedNodes = members; this.commitLayout(before);
   }
-  private addLayoutMenu(menu: Menu) {
+  private exportSelection() {
+    if (!this.sidecar) return;
+    const comments = selectedComments(this.sidecar, this.selectedNodes);
+    if (!comments.length) { new Notice("Select at least one comment or a page containing comments."); return; }
+    new ExportModal(this.app, {
+      pdfPath: this.sidecar.pdfPath, vaultName: this.app.vault.getName(), notes: this.sidecar.notes,
+      comments: comments.map(annotation => ({ ...structuredClone(annotation), categoryLabel: this.categories.forAnnotation(annotation).label })),
+    }, this.categories.themeColors()).open();
+  }
+  private addLayoutMenu(menu: Menu, fromToolbar = false) {
     if (this.mode !== "canvas") return;
-    menu.addSeparator();
+    if (!fromToolbar) menu.addSeparator();
     const group = this.selectedNodes.size === 1 ? this.layout.groups.find(g => this.selectedNodes.has(`g:${g.id}`)) : undefined;
     if (group) menu.addItem(item => item.setTitle("Rename group").setIcon("pencil").onClick(() => this.renameGroup(group.id)));
     menu.addItem(item => item.setTitle("Group selection").setIcon("group").setDisabled(this.expandedSelection().size < 2).onClick(() => this.groupSelection()));
     menu.addItem(item => item.setTitle("Ungroup selection").setIcon("ungroup").setDisabled(!this.layout.groups.some(g => this.selectedNodes.has(`g:${g.id}`) || g.members.every(key => this.expandedSelection().has(key)))).onClick(() => this.ungroupSelection()));
+    menu.addItem(item => item.setTitle("Select all pages and comments").setIcon("square-dashed").onClick(() => { this.selectedNodes = new Set(this.nodeBounds().keys()); this.updateSelectionPaint(); }));
+    menu.addItem(item => item.setTitle("Export selection…").setIcon("file-output").setDisabled(!this.sidecar || !selectedComments(this.sidecar, this.selectedNodes).length).onClick(() => this.exportSelection()));
+    if (fromToolbar) return;
     menu.addItem(item => item.setTitle("Undo canvas change").setIcon("undo-2").setDisabled(!this.history.canUndo).onClick(() => this.restoreLayout(false)));
     menu.addItem(item => item.setTitle("Redo canvas change").setIcon("redo-2").setDisabled(!this.history.canRedo).onClick(() => this.restoreLayout(true)));
     menu.addItem(item => item.setTitle("Snap to grid and objects").setIcon("magnet").setChecked(this.layout.snap).onClick(() => this.toggleSnap()));
-    menu.addItem(item => item.setTitle("Select all pages and comments").onClick(() => { this.selectedNodes = new Set(this.nodeBounds().keys()); this.updateSelectionPaint(); }));
     menu.addItem(item => item.setTitle("Fit PDF and comments").setIcon("scan").onClick(() => this.fit()));
-    menu.addItem(item => item.setTitle("Rearrange pages and comments").setIcon("layout-dashboard").onClick(() => { void this.rearrangeCards(); }));
+    menu.addItem(item => item.setTitle("Rearrange pages and comments").setIcon("layout-list").onClick(() => { void this.rearrangeCards(); }));
   }
   private contextMenu(event: MouseEvent) {
     if (!this.sidecar) return;
@@ -740,7 +759,12 @@ export class PdfAnnotatorView extends FileView {
     setIcon(badge.createSpan(), category.icon); badge.createSpan({ text: category.label });
     this.button(header, "ellipsis", "Comment actions", () => this.cardMenu(annotation, header));
     header.onpointerdown = event => { if (!(event.target as HTMLElement).closest("button")) this.startNodeDrag(event, cardKey(annotation.id), header); };
-    card.onpointerdown = event => { if (event.button === 0 && !(event.target as HTMLElement).closest("button, .pdfaw-card-header")) { this.selectNode(cardKey(annotation.id), event.shiftKey || this.multiSelect); if (event.shiftKey || this.multiSelect) event.preventDefault(); } };
+    card.onpointerdown = event => {
+      if (event.button !== 0 || this.tool !== "select" || (event.target as HTMLElement).closest("button, .pdfaw-card-header")) return;
+      const additive = this.extendsSelection(event);
+      this.selectNode(cardKey(annotation.id), additive);
+      if (additive) { event.preventDefault(); this.clearSelection(); this.win.getSelection()?.removeAllRanges(); this.root.focus(); }
+    };
     card.createEl("h3", { text: annotation.title || (annotation.comment ? "Comment" : "Highlighted passage") });
     const body = card.createDiv({ cls: "pdfaw-comment-body" });
     if (annotation.comment) body.createDiv({ text: annotation.comment }); else body.createEl("blockquote", { text: annotation.text });
@@ -752,7 +776,7 @@ export class PdfAnnotatorView extends FileView {
     jump.onclick = () => this.focusAnnotation(annotation);
     footer.createEl("time", { text: new Date(annotation.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short" }), attr: { datetime: new Date(annotation.updatedAt).toISOString() } });
     card.onfocus = () => this.selectNode(cardKey(annotation.id), false, true);
-    card.ondblclick = event => { if (!(event.target as HTMLElement).closest("button")) this.editAnnotation(annotation); };
+    card.ondblclick = event => { if (!this.extendsSelection(event) && !(event.target as HTMLElement).closest("button")) this.editAnnotation(annotation); };
     card.onkeydown = event => {
       if (event.target !== card) return;
       if (event.key === "Enter") { event.preventDefault(); this.editAnnotation(annotation); }
@@ -940,9 +964,10 @@ export class PdfAnnotatorView extends FileView {
     if (event.button !== 1 && (event.button !== 0 || (this.tool !== "hand" && target.closest("[data-node]")))) return;
     event.preventDefault(); this.clearSelection(); this.win.getSelection()?.removeAllRanges(); this.root.focus();
     const marquee = event.button === 0 && this.tool === "select" && event.pointerType !== "touch";
+    const additive = this.extendsSelection(event);
     this.gesture = { pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, origin: { x: this.camera.x, y: this.camera.y }, element: this.viewport,
-      ...(marquee ? { marquee: this.toWorld(event.clientX, event.clientY), additive: new Set(event.shiftKey ? this.selectedNodes : []) } : {}) };
-    if (marquee && !event.shiftKey) { this.selectedNodes.clear(); this.updateSelectionPaint(); }
+      ...(marquee ? { marquee: this.toWorld(event.clientX, event.clientY), additive: new Set(additive ? this.selectedNodes : []) } : {}) };
+    if (marquee && !additive) { this.selectedNodes.clear(); this.updateSelectionPaint(); }
     this.viewport.setPointerCapture(event.pointerId); this.viewport.toggleClass("is-panning", !marquee);
   }
   private moveGesture(event: PointerEvent) {
@@ -950,6 +975,8 @@ export class PdfAnnotatorView extends FileView {
     const gesture = this.gesture; if (!gesture || gesture.pointer !== event.pointerId) return;
     const dx = event.clientX - gesture.start.x, dy = event.clientY - gesture.start.y;
     if (gesture.nodes) {
+      if (!gesture.moved && Math.hypot(dx, dy) < 4) return;
+      gesture.moved = true;
       let delta = { x: dx / this.camera.zoom, y: dy / this.camera.zoom };
       if (this.layout.snap && !event.altKey) {
         const boxes = this.nodeBounds();
@@ -979,6 +1006,7 @@ export class PdfAnnotatorView extends FileView {
       if (cancel && this.sidecar) { this.sidecar.canvasLayout = gesture.before; this.applyLayout(); }
       else this.commitLayout(gesture.before);
     }
+    if (!cancel && gesture.nodeKey && !gesture.moved) this.selectNode(gesture.nodeKey);
     this.marqueeEl.hidden = true; this.viewport.removeClass("is-panning");
   }
   private pinchTouches(event: TouchEvent) {

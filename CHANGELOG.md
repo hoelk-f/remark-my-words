@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 — 2026-10-22
+- Export selected comments as one combined Markdown file or one file per comment, with optional document notes, PDF page links, and links back to the original comments. Selected pages and groups include all their comments, including filtered or offscreen cards.
+- Create exports inside the vault without overwriting existing files. Use numbered names for duplicates and resume remaining files after a partial export failure.
+- Use click to select one Canvas item and Ctrl/Command/Shift-click to extend or toggle the selection. Drag selected items together and extend marquee selections with the same modifiers; retain the touch multiple-selection button.
+- Move Undo and Redo next to page navigation, update the Rearrange icon, remove the Group selection toolbar button while preserving menus and shortcuts, and simplify Canvas actions. Add icons to Select all pages and comments and more space above Add category.
+- Attribute future release commits and GitHub releases to hoelk-f, with identity checks before publication.
+- Verify selection, grouping, toolbar controls, both Markdown export formats, PDF links, and the 120-page/1,200-comment Canvas directly in Obsidian 1.14.4 on Linux.
+- Cover Markdown exports, selection, groups, history, large PDFs, touch gestures, persistence, and release safeguards with automated regression tests. Actual iOS/Android app testing remains pending.
+
 ## 0.4.1 — 2026-10-22
 - Start Canvas fitted to the first PDF page. Keep the full overview available through Fit PDF and comments, and restore the previous Canvas camera when returning from Reading.
 - Show the first page before preparing all remaining page sizes. Load dimensions in yielding batches and let direct navigation bypass the background queue, preserving saved and manually moved positions.
