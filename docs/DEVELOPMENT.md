@@ -35,9 +35,13 @@ PDF coordinates use a fixed scale of 1.35. Camera zoom is separate, so changing
 the display does not change saved highlights or card positions. The PDF bitmap
 is rendered at the current camera zoom times the display's pixel density, with
 limits of approximately 16 megapixels and 8192 pixels per side, with a shared
-32-megapixel target across visible pages and at most two page renders at a time.
-Offscreen pages keep lightweight geometry and highlights; their bitmap and text
-layer are released unless they own an active text selection. Zoom changes are
+24-megapixel target across visible pages and at most two main-page renders at a
+time. A separate cache retains at most three offscreen pages and eight megapixels
+of bitmap data, keeping the steady raster target near 32 megapixels. These limits
+do not include PDF source bytes, decoded images, or transient replacement bitmaps.
+Evicted pages release their text layer and request PDF.js page cleanup. Active
+native PDF text selections remain pinned. Thumbnails render serially after the
+first page becomes usable. Zoom changes are
 debounced for 120 ms; a completed bitmap replaces the previous one without
 rebuilding the text layer or selection. Stale renders are canceled when zoom,
 page, or document changes. Dialogs share the view's configured theme colors.
@@ -82,9 +86,42 @@ after moving a page, selection/grouping, actual Obsidian context menus, group
 movement and naming, rearrange, undo/redo, reopening, the comments sidebar, and
 category dropdowns. Browser mocks do not substitute for this host test or certify
 iOS/Android. These host flows were exercised in Obsidian 1.14.4 on Linux for
-0.4.0. The browser suite also tests a 120-page PDF and touch grouping.
+0.4.0 and 0.4.1. The browser suite also tests a 120-page PDF and touch grouping.
 Old `.remark.canvas` files are never read, updated, or removed by the
 unified view. The protocol handler remains available for their source links.
+
+## Large-document performance
+
+Canvas starts fitted to page 1, and returning from Reading retains the saved
+Canvas camera. Initial loading requests the first page and creates lightweight
+placeholders for the rest. Exact page sizes are prepared in yielding batches;
+direct navigation bypasses that queue. Only automatically placed, unmoved items
+are adjusted as sizes arrive, while the camera preserves the current page anchor.
+Saved positions remain unchanged. Rearrange waits for dimensions and measures
+comment heights before placing all pages and comments.
+
+Viewport updates run at most once per animation frame. Page visibility comes
+from saved coordinates and the camera, without measuring each page element.
+Camera changes do not rebuild lines or groups. Layout changes update only the
+moved elements; connections reuse SVG nodes and update changed geometry. Card
+heights come from measurement/resize notifications, not repeated pan-time reads.
+
+Documents with more than 80 annotations mount only nearby cards (plus focused,
+text-selected, or actively dragged cards). A card is recreated only when its
+content changes. Layout/group selection continues to use all annotation records,
+including unmounted cards; cached heights support offscreen geometry.
+
+`tests/performance-browser.mjs` records first-page load time and frame samples
+with 120 pages and 1,200 comments. Its stable assertions check zero per-page DOM
+measurements and zero connection rebuilds for small camera moves, and fewer than
+100 mounted cards in the tested first-page viewport. Local comparison with 0.4.0
+reduced these counts from 3,600 measurements / 30 rebuilds / 1,200 mounted cards
+to 0 / 0 / 10 across 30 moves. Timing output is diagnostic, without machine-specific
+CI thresholds or claims about arbitrary PDFs or physical phones.
+
+Additional tests stall background metadata, navigate directly to distant pages,
+check saved/manual positions, verify bounded bitmap reuse, and render a generated
+PDF with independent compressed images, text, vectors, and mixed page sizes.
 
 ## Data compatibility
 

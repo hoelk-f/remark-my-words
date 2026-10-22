@@ -1,3 +1,5 @@
+import {fixturePdf, complexPdf} from "./pdf-fixtures.mjs";
+import { testPerformance } from "./performance-browser.mjs";
 import { testBoard } from "./board-browser.mjs";
 import { testCategories } from "./category-browser.mjs";
 import { testRendering } from "./rendering-browser.mjs";
@@ -16,45 +18,11 @@ const artifacts = path.join(root, '.test-artifacts');
 await mkdir(artifacts, { recursive: true });
 const bundle = await build({ absWorkingDir: root, entryPoints: ['tests/browser-entry.mjs'], bundle: true, write: false, format: 'esm', plugins: [pdfWorkerPlugin], alias: { obsidian: path.join(root, 'tests/obsidian-mock.mjs') } });
 
-function fixturePdf(pages = 2) {
-  const line = (text, x, y, size = 12, font = 'F1') => `BT /${font} ${size} Tf 1 0 0 1 ${x} ${y} Tm <${Buffer.from(text, 'latin1').toString('hex')}> Tj ET\n`;
-  let stream = line('Universität Musterstadt', 48, 795, 10) + line('Müller et al. (2023)', 432, 795, 10);
-  stream += line('F', 48, 768, 18) + line('RAMEWORK', 57, 768, 14);
-  stream += line('Der Einfluss von Gewohnheiten', 48, 737, 23, 'F2') + line('auf produktives Arbeiten', 48, 710, 23, 'F2');
-  const sections = [
-    ['1.  Einleitung', ['Gewohnheiten spielen eine zentrale Rolle in unserem alltäglichen Handeln.', 'Sie ermöglichen es, kognitive Ressourcen zu sparen und wiederkehrende', 'Aufgaben effizient zu bewältigen. In den letzten Jahren ist das Interesse', 'an der Formierung und Veränderung von Gewohnheiten deutlich gestiegen.', '', 'Trotz dieser Fortschritte bleibt jedoch unklar, in welchem Ausmaß', 'Gewohnheiten langfristig wirken und welche Faktoren entscheidend sind.', 'Nicht alle Gewohnheiten sind per se positiv zu bewerten, sondern der', 'Kontext spielt eine entscheidende Rolle.']],
-    ['2.  Theoretischer Hintergrund', ['Der Begriff der Gewohnheit wird in der Forschung unterschiedlich definiert.', 'Einige Autoren verstehen Gewohnheiten als automatisierte Verhaltensweisen.', 'Andere betonen die Bedeutung bewusster kognitiver Prozesse.', 'Dazu finden sich Hinweise bei Lally et al. (2010).']],
-    ['3.  Methodik', ['In der vorliegenden Studie wurde ein Mixed-Methods-Ansatz gewählt.', 'Quantitative Umfragedaten wurden mit qualitativen Interviews kombiniert.', 'Die Stichprobe umfasste N = 120 Teilnehmende über acht Wochen.', 'Die Daten wurden mittels standardisierter Claimbögen erhoben.']],
-    ['4.  Ergebnisse', ['Die Ergebnisse zeigen einen Zusammenhang mit höherer Produktivität.', 'Gleichzeitig zeigen sich individuelle Unterschiede und situative Faktoren.', 'Der Kontext spielt eine wichtige moderierende Rolle.']],
-  ];
-  let y = 660;
-  for (const [heading, lines] of sections) {
-    stream += line(heading, 48, y, 16, 'F2'); y -= 26;
-    for (const text of lines) { if (text) stream += line(text, 48, y); y -= text ? 17 : 9; }
-    y -= 25;
-  }
-  stream += line('1', 292, 30, 10);
-  const second = line('Diskussion und Ausblick', 48, 750, 23, 'F2') + line('Weitere Forschung untersucht langfristige Effekte.', 48, 690) + line('2', 292, 30, 10);
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    `<< /Type /Pages /Kids [${Array.from({length:pages},(_,i)=>`${i+3} 0 R`).join(' ')}] /Count ${pages} >>`,
-    ...Array.from({length:pages},(_,i)=>`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 ${i===0?842:792}] /Resources << /Font << /F1 ${pages+3} 0 R /F2 ${pages+4} 0 R >> >> /Contents ${i===0?pages+5:pages+6} 0 R >>`),
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>',
-    `<< /Length ${stream.length} >>\nstream\n${stream}endstream`,
-    `<< /Length ${second.length} >>\nstream\n${second}endstream`,
-  ];
-  let pdf = '%PDF-1.4\n', offsets = [0];
-  objects.forEach((object, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; });
-  const start = pdf.length;
-  pdf += `xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
-  return Buffer.from(pdf);
-}
 const html = `<!DOCTYPE html><html><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body,#app{height:100%;margin:0}body{--font-interface:Arial,sans-serif;font-family:Arial,sans-serif}button,input,textarea,select{font:inherit}button{border:1px solid #424855;border-radius:5px} .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;background:#242832;color:white;padding:25px;border:1px solid #777;border-radius:12px;overflow:auto}.setting-item{display:flex;justify-content:space-between;padding:12px 0}.setting-item-control{order:1;display:flex;gap:8px}</style><link rel="stylesheet" href="/styles.css"><div id="app"></div><script type="module" src="/bundle.js"></script></html>`;
 const routes = new Map([
   ['/', ['text/html', html]], ['/bundle.js', ['text/javascript', bundle.outputFiles[0].contents]],
   ['/styles.css', ['text/css', await readFile(path.join(root, 'styles.css'))]],
-  ['/fixture.pdf', ['application/pdf', fixturePdf()]], ['/long-fixture.pdf', ['application/pdf', fixturePdf(120)]],
+  ['/fixture.pdf', ['application/pdf', fixturePdf()]], ['/long-fixture.pdf', ['application/pdf', fixturePdf(120)]], ['/complex-fixture.pdf', ['application/pdf', complexPdf()]],
 ]);
 const server = createServer((req, res) => { const route = routes.get(req.url); res.writeHead(route ? 200 : 404, { 'Content-Type': route?.[0] ?? 'text/plain' }); res.end(route?.[1] ?? 'Not found'); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -80,7 +48,7 @@ try {
   });
   const cdp = (method, params = {}) => new Promise((resolve, reject) => { const request = ++id; pending.set(request, { resolve, reject }); socket.send(JSON.stringify({ id: request, method, params })); });
   const evaluate = async expression => { const result = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description); return result.result.value; };
-  const until = async expression => { for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await new Promise(resolve => setTimeout(resolve, 100)); } throw new Error(`Timeout: ${expression}`); };
+  const until = async expression => { for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await new Promise(resolve => setTimeout(resolve, 100)); } console.error('Timeout state', await evaluate(`typeof view==='undefined'?null:({mode:view.mode,current:view.currentPage,ready:view.pageReady,changing:view.pageChangePending,frame:view.rasterFrame,timer:view.rasterTimer,running:view.pages.running,queue:view.pages.queue.map(s=>s.number),surfaces:[...view.pages.surfaces.values()].filter(s=>s.pending||s.wanted).map(s=>({n:s.number,pending:!!s.pending,task:!!s.task,wanted:s.wanted,failed:s.failed,density:s.density,requested:s.requested,canvas:!!s.canvas,text:!!s.textLayer}))})`)); throw new Error(`Timeout: ${expression}`); };
   await cdp('Runtime.enable'); await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1672, height: 941, deviceScaleFactor: 1, mobile: false });
   await cdp('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/` });
@@ -210,6 +178,7 @@ try {
   await evaluate('view.showPage(1)');
   const canvasState = await evaluate('({ camera: {...view.camera}, positions: view.sidecar.annotations.map(a=>a.position) })');
   await evaluate(`document.querySelector('button[aria-label="Reading mode"]').click()`);
+  await until('view.pageReady && !view.pageChangePending');
   assert.equal(await evaluate('view.mode'), 'reading');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pdfaw-cards')).display`), 'none');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.pdfaw-viewport')).overflowY`), 'auto');
@@ -365,6 +334,7 @@ try {
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-sidebar-comment").length'),0);
   await evaluate('view.showPage(1)');
   await evaluate('document.querySelector(".test-sidebar").style.display="none"');
+  await testPerformance({evaluate, until, cdp}, process.env.PERF_BASELINE === "1");
   await testBoard({evaluate, until, cdp});
   await testCategories({evaluate, until, cdp});
   await testRendering({evaluate, until, cdp});

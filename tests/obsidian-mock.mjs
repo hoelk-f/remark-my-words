@@ -7,6 +7,8 @@ function createEl(tag, options = {}) {
   for (const [key, value] of Object.entries(options.attr ?? {})) element.setAttribute(key, value);
   this.appendChild(element); return element;
 }
+Object.defineProperty(Document.prototype, "win", {get(){return this.defaultView;}});
+window.createFragment = () => document.createDocumentFragment();
 window.createEl = (tag, options) => createEl.call(document.createDocumentFragment(), tag, options);
 Object.assign(Element.prototype, {
   setCssProps(props) { for (const [key, value] of Object.entries(props)) this.style.setProperty(key, value); },

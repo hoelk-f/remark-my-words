@@ -29,12 +29,18 @@ export function cleanLayout(layout: BoardLayout, sizes: PageSize[], annotations:
   for (const page of Object.keys(layout.pages)) if (!valid.has(pageKey(Number(page)))) delete layout.pages[page];
   layout.groups = layout.groups.map(group => ({ ...group, members: group.members.filter(key => valid.has(key)) })).filter(group => group.members.length);
 }
+function annotationsByPage(annotations: Annotation[]) {
+  const pages = new Map<number, Annotation[]>();
+  for (const annotation of annotations) { const list = pages.get(annotation.page) ?? []; list.push(annotation); pages.set(annotation.page, list); }
+  return pages;
+}
 /** Existing annotation.position values are page-local and are never rewritten. */
 export function ensureLayout(layout: BoardLayout, sizes: PageSize[], annotations: Annotation[], heights: Map<string, number> = new Map()) {
   cleanLayout(layout, sizes, annotations);
+  const byPage = annotationsByPage(annotations);
   let bottom = 0;
   sizes.forEach((size, index) => {
-    const page = index + 1, items = annotations.filter(a => a.page === page);
+    const page = index + 1, items = byPage.get(page) ?? [];
     const origin = layout.pages[page] ??= { x: 0, y: bottom };
     let leftY = origin.y + 28, rightY = origin.y + 28;
     items.forEach((annotation, i) => {
@@ -50,11 +56,12 @@ export function ensureLayout(layout: BoardLayout, sizes: PageSize[], annotations
 }
 export function arrangeLayout(layout: BoardLayout, sizes: PageSize[], annotations: Annotation[], heights: Map<string, number>) {
   cleanLayout(layout, sizes, annotations);
+  const byPage = annotationsByPage(annotations);
   let y = 0;
   sizes.forEach((size, index) => {
     const page = index + 1; layout.pages[page] = { x: 0, y };
     let left = y + 28, right = y + 28;
-    annotations.filter(a => a.page === page).forEach((annotation, i) => {
+    (byPage.get(page) ?? []).forEach((annotation, i) => {
       layout.cards[annotation.id] = { x: i % 2 === 0 ? -460 : size.width + 90, y: i % 2 === 0 ? left : right };
       const height = (heights.get(annotation.id) ?? estimatedHeight(annotation)) + 32;
       if (i % 2 === 0) left += height; else right += height;

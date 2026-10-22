@@ -39,7 +39,7 @@ The PDF renderer is bundled with the plugin, so no additional download is needed
 
 1. After installing, enable **Remark My Words** under **Settings > Community plugins**.
 2. Run **Remark My Words: Open PDF** from the command palette or click the pen-and-file ribbon icon. The active PDF opens immediately; otherwise choose a PDF from the vault. You can also right-click a PDF and choose **Open in Remark My Words**.
-3. Choose **Reading mode** for one page at a time or **Canvas mode** for the whole document. Both modes support passage selection and comments.
+3. Choose **Reading mode** for one page at a time or **Canvas mode** for the whole document. Canvas initially fits the first page; **Fit PDF and comments** opens the full overview. Returning from Reading restores your previous Canvas camera. Both modes support passage selection and comments.
 4. Select text, click a category in the floating toolbar, and fill in **Add comment**. Right-clicking selected text also offers categories.
 5. In Reading, click a highlighted passage to open its comment, then use **Edit** or **Delete** as needed. **Read page comments** opens a dockable right sidebar that follows page navigation and supports editing and deletion.
 6. In Canvas, drag a page by its title bar or a comment by its header. Shift-click to select several items, or drag a selection rectangle on the background. On touchscreens, enable **Select multiple items** and tap the items. Group the selection from the toolbar or right-click menu. Drag the group title to move its members together. The page thumbnails on the left jump to each page's current position. **Rearrange pages and comments** stacks pages vertically with comments on both sides, calculating spacing from their heights and preserving groups.
@@ -50,6 +50,10 @@ background. The **Canvas actions** toolbar menu also exposes these layout action
 on touchscreens. **Undo/Redo canvas change** restores layout operations; **Snap to grid
 and objects** enables alignment, with Alt temporarily bypassing it while dragging.
 Double-click a group title to rename it; **Ungroup selection** keeps its members.
+
+The first page becomes usable while the remaining page sizes are prepared in the
+background. Large comment collections only build cards near the visible area,
+and recently viewed pages use a limited cache for faster back navigation.
 
 The layout is saved in the existing annotation JSON file. Older `.remark.canvas`
 files from version 0.3.0 remain untouched and can still be opened in Obsidian.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1 — 2026-10-22
+- Start Canvas fitted to the first PDF page. Keep the full overview available through Fit PDF and comments, and restore the previous Canvas camera when returning from Reading.
+- Show the first page before preparing all remaining page sizes. Load dimensions in yielding batches and let direct navigation bypass the background queue, preserving saved and manually moved positions.
+- Coalesce viewport work per animation frame and calculate visibility from page coordinates. Panning and zooming no longer rebuild unchanged connection lines or group frames.
+- Reuse comment cards and SVG connections; virtualize large comment collections and cache card measurements. Grouping, selection, and saved layout still include offscreen items.
+- Keep the current page usable if loading a requested page fails, and allow retrying navigation.
+- Keep a bounded cache of recently viewed PDF pages, serialize thumbnails, and clean up evicted PDF.js page resources.
+- Verify the updated view directly in Obsidian 1.14.4 on Linux. Actual iOS/Android app testing remains pending.
+- Add performance regression checks with 120 pages and 1,200 comments, blocked-loading/navigation cases, cache limits, and image/vector PDFs with mixed page sizes. Retain existing selection, Reading, category, group, history, persistence, and touch coverage.
+
 ## 0.4.0 — 2026-10-21
 - Replace the separate native Canvas and Page layout modes with one multipage PDF Canvas, retaining direct text selection, highlights, and passage connections.
 - Move PDF pages and comment cards independently; navigate from thumbnails to each page’s current position.

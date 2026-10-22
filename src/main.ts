@@ -46,6 +46,16 @@ export class PdfAnnotatorView extends FileView {
   private filterBar!: HTMLDivElement;
   private toolButtons = new Map<string, HTMLButtonElement>();
   private cards = new Map<string, HTMLDivElement>();
+  private cardSizes = new Map<string, number>();
+  private cardSignatures = new Map<string, string>();
+  private connections = new Map<string, { path: SVGPathElement; anchor: SVGCircleElement; signature: string }>();
+  private rasterFrame = 0;
+  private dimensionFrame = 0;
+  private autoPages = new Set<string>();
+  private autoCards = new Set<string>();
+  private layoutSaved = false;
+  private thumbQueue: number[] = [];
+  private thumbRunning = false;
   private thumbButtons = new Map<number, HTMLButtonElement>();
   private sidecar: Sidecar | null = null;
   private pdf: PDFDocumentProxy | null = null;
@@ -143,7 +153,7 @@ export class PdfAnnotatorView extends FileView {
     this.button(right, "messages-square", "Read page comments", () => {
       this.updateSidebar(); void this.sidebars.show(COMMENTS_VIEW);
     }, "pdfaw-read-comments");
-    this.button(right, "layout-dashboard", "Rearrange pages and comments", () => this.rearrangeCards(), "pdfaw-canvas-control");
+    this.button(right, "layout-dashboard", "Rearrange pages and comments", () => { void this.rearrangeCards(); }, "pdfaw-canvas-control");
     this.undoButton = this.button(right, "undo-2", "Undo canvas change", () => this.restoreLayout(false), "pdfaw-canvas-control");
     this.redoButton = this.button(right, "redo-2", "Redo canvas change", () => this.restoreLayout(true), "pdfaw-canvas-control");
     this.snapButton = this.button(right, "magnet", "Snap to grid and objects", () => this.toggleSnap(), "pdfaw-canvas-control");
@@ -165,7 +175,7 @@ export class PdfAnnotatorView extends FileView {
     this.pageEl = this.stage.createDiv({ cls: "pdfaw-page" });
     this.links = svg(this.stage, "svg", { class: "pdfaw-connections", "aria-hidden": "true" });
     this.cardsEl = this.stage.createDiv({ cls: "pdfaw-cards" });
-    this.pages = new PdfPages(this.stage, this.win, surface => this.installPage(surface));
+    this.pages = new PdfPages(this.stage, this.win, surface => this.installPage(surface), () => this.queueDimensions(), () => this.refreshViewport());
     this.marqueeEl = this.viewport.createDiv({ cls: "pdfaw-marquee", attr: { hidden: "true" } });
     this.filterBar = this.viewport.createDiv({ cls: "pdfaw-filters", attr: { "aria-label": "Filter comments by category" } });
     this.renderFilters();
@@ -272,14 +282,34 @@ export class PdfAnnotatorView extends FileView {
         // Rebuilding hidden canvas cards also sends resize notifications.
         // Only a viewport resize changes the Reading layout or its previews.
         if (entries.some(entry => entry.target === this.viewport)) this.applyCamera();
-      } else this.queueGeometry();
+      } else {
+        if (entries.some(entry => entry.target !== this.viewport)) { this.measureCards(); this.queueGeometry(); }
+      }
     });
     this.resizeObserver.observe(this.viewport);
     this.register(() => this.resizeObserver?.disconnect());
   }
 
   private get layout(): BoardLayout { return this.sidecar!.canvasLayout ??= emptyLayout(); }
-  private cardHeights() { return new Map([...this.cards].filter(([, el]) => el.offsetHeight > 0).map(([id, el]) => [id, el.offsetHeight])); }
+  private measureCards() { for (const [id, card] of this.cards) { const height = card.offsetHeight; if (height) this.cardSizes.set(id, height); } }
+  private cardHeights() { this.measureCards(); return new Map(this.cardSizes); }
+  private queueDimensions() {
+    if (this.dimensionFrame) return;
+    this.dimensionFrame = this.win.requestAnimationFrame(() => { this.dimensionFrame = 0; this.updateDimensions(); });
+  }
+  private updateDimensions() {
+    if (!this.sidecar) return;
+    this.win.cancelAnimationFrame(this.dimensionFrame); this.dimensionFrame = 0;
+    const prior = this.layout.pages[this.currentPage];
+    for (const number of this.autoPages) delete this.layout.pages[number];
+    for (const id of this.autoCards) delete this.layout.cards[id];
+    this.ensureBoard();
+    const next = this.layout.pages[this.currentPage], surface = this.pages.surfaces.get(this.currentPage);
+    if (surface) { this.pageWidth = surface.width; this.pageHeight = surface.height; }
+    if (prior && next && this.mode === "canvas") { this.camera.x += (prior.x - next.x) * this.camera.zoom; this.camera.y += (prior.y - next.y) * this.camera.zoom; }
+    this.applyLayout(); this.applyCamera();
+    if (this.layoutSaved) void this.save();
+  }
   private ensureBoard() { if (this.sidecar && this.pages.surfaces.size) ensureLayout(this.layout, this.pages.sizes, this.sidecar.annotations, this.cardHeights()); }
   private installPage(surface: PageSurface) {
     surface.header.onpointerdown = event => this.startNodeDrag(event, pageKey(surface.number), surface.header);
@@ -292,20 +322,22 @@ export class PdfAnnotatorView extends FileView {
     for (const surface of this.pages.surfaces.values()) {
       const pos = this.layout.pages[surface.number]; if (pos) boxes.set(pageKey(surface.number), { ...pos, width: surface.width, height: surface.height });
     }
-    for (const annotation of this.sidecar.annotations) boxes.set(cardKey(annotation.id), { ...this.position(annotation), width: CARD_WIDTH, height: this.cards.get(annotation.id)?.offsetHeight || estimatedHeight(annotation) });
+    for (const annotation of this.sidecar.annotations) boxes.set(cardKey(annotation.id), { ...this.position(annotation), width: CARD_WIDTH, height: this.cardSizes.get(annotation.id) ?? estimatedHeight(annotation) });
     return boxes;
   }
-  private applyLayout() {
+  private applyLayout(changed?: Set<string>) {
     if (!this.sidecar) return;
     for (const surface of this.pages.surfaces.values()) {
+      if (changed && !changed.has(pageKey(surface.number))) continue;
       const pos = this.mode === "canvas" ? this.layout.pages[surface.number] : { x: 0, y: 0 };
       if (pos) { surface.shell.style.left = `${pos.x}px`; surface.shell.style.top = `${pos.y}px`; }
       surface.shell.hidden = this.mode === "reading" && surface.number !== this.currentPage;
     }
     for (const [id, el] of this.cards) {
+      if (changed && !changed.has(cardKey(id))) continue;
       const pos = this.layout.cards[id]; if (pos) { el.style.left = `${pos.x}px`; el.style.top = `${pos.y}px`; }
     }
-    this.renderGroups(); this.queueGeometry(); this.queuePageRaster();
+    this.queueGeometry(); this.queuePageRaster();
   }
   private renderGroups() {
     if (!this.sidecar) return;
@@ -320,18 +352,23 @@ export class PdfAnnotatorView extends FileView {
         header.ondblclick = () => this.renameGroup(group.id);
         this.groupElements.set(group.id, el);
       }
-      el.firstElementChild!.textContent = group.name;
+      if (el.firstElementChild!.textContent !== group.name) el.firstElementChild!.textContent = group.name;
+      el.toggleClass("is-selected", this.selectedNodes.has(`g:${group.id}`));
       const members = group.members.flatMap(key => boxes.has(key) ? [boxes.get(key)!] : []);
       el.hidden = !members.length;
       const box = enclosingBounds(members, 45); box.y -= 32; box.height += 32;
-      Object.assign(el.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` });
+      const props = { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` };
+      for (const key of ["left", "top", "width", "height"] as const) if (el.style[key] !== props[key]) el.style[key] = props[key];
     }
   }
   private toWorld(x: number, y: number): Point {
     const rect = this.viewport.getBoundingClientRect();
     return { x: (x - rect.left - this.camera.x) / this.camera.zoom, y: (y - rect.top - this.camera.y) / this.camera.zoom };
   }
-  private setNodePosition(key: string, pos: Point) { if (key.startsWith("p:")) this.layout.pages[key.slice(2)] = pos; else this.layout.cards[key.slice(2)] = pos; }
+  private setNodePosition(key: string, pos: Point) {
+    if (key.startsWith("p:")) { this.autoPages.delete(key.slice(2)); this.layout.pages[key.slice(2)] = pos; }
+    else { this.autoCards.delete(key.slice(2)); this.layout.cards[key.slice(2)] = pos; }
+  }
   private expandedSelection() {
     const keys = new Set<string>();
     for (const key of this.selectedNodes) {
@@ -370,13 +407,13 @@ export class PdfAnnotatorView extends FileView {
     this.camera.y += 65; this.applyCamera();
   }
   private commitLayout(before: BoardLayout) {
-    if (this.history.commit(before, this.layout)) { this.applyLayout(); this.updateSelectionPaint(); void this.save(); }
+    if (this.history.commit(before, this.layout)) { this.autoPages.clear(); this.autoCards.clear(); this.applyLayout(); this.updateSelectionPaint(); void this.save(); }
   }
   private restoreLayout(redo: boolean) {
     if (!this.sidecar) return;
     this.stopGesture(); const restored = redo ? this.history.redo(this.layout) : this.history.undo(this.layout);
     if (!restored) return;
-    this.sidecar.canvasLayout = restored; this.ensureBoard(); this.selectedNodes.clear(); this.applyLayout(); this.updateSelectionPaint(); void this.save();
+    this.sidecar.canvasLayout = restored; this.autoPages.clear(); this.autoCards.clear(); this.ensureBoard(); this.selectedNodes.clear(); this.applyLayout(); this.updateSelectionPaint(); void this.save();
   }
   private toggleSnap() { if (!this.sidecar) return; const before = structuredClone(this.layout); this.layout.snap = !this.layout.snap; this.commitLayout(before); }
   private groupSelection() {
@@ -414,7 +451,7 @@ export class PdfAnnotatorView extends FileView {
     menu.addItem(item => item.setTitle("Snap to grid and objects").setIcon("magnet").setChecked(this.layout.snap).onClick(() => this.toggleSnap()));
     menu.addItem(item => item.setTitle("Select all pages and comments").onClick(() => { this.selectedNodes = new Set(this.nodeBounds().keys()); this.updateSelectionPaint(); }));
     menu.addItem(item => item.setTitle("Fit PDF and comments").setIcon("scan").onClick(() => this.fit()));
-    menu.addItem(item => item.setTitle("Rearrange pages and comments").setIcon("layout-dashboard").onClick(() => this.rearrangeCards()));
+    menu.addItem(item => item.setTitle("Rearrange pages and comments").setIcon("layout-dashboard").onClick(() => { void this.rearrangeCards(); }));
   }
   private contextMenu(event: MouseEvent) {
     if (!this.sidecar) return;
@@ -479,9 +516,13 @@ export class PdfAnnotatorView extends FileView {
       this.pdf = pdf; this.sidecar = data; this.renderFilters();
       this.noteInput.disabled = false; this.noteInput.value = data.notes; this.saveStatus.setText("Local to vault");
       this.pageTotal.setText(String(pdf.numPages)); this.pageInput.max = String(pdf.numPages);
-      this.buildThumbnails(); this.pageEl.remove(); await this.pages.prepare(pdf);
+      this.pageEl.remove(); await this.pages.prepare(pdf);
       if (generation !== this.generation) return;
-      this.ensureBoard(); await this.showPage(1);
+      this.autoPages = new Set([...this.pages.surfaces.keys()].map(String).filter(number => !this.layout.pages[number]));
+      this.autoCards = new Set(data.annotations.filter(a => !this.layout.cards[a.id]).map(a => a.id));
+      this.currentPage = 1; this.ensureBoard(); this.activatePage(1); this.renderAnnotations(); await this.showPage(1);
+      if (generation !== this.generation) return;
+      this.pages.prepareRemaining(); this.buildThumbnails();
     } catch (error) {
       if (generation !== this.generation) return;
       this.pageEl.empty();
@@ -504,6 +545,11 @@ export class PdfAnnotatorView extends FileView {
     this.commentPreview.hide();
     this.selectionPointer = null; this.commentPress = null; this.pageChangePending = false;
     this.generation++; this.pageGeneration++; this.pages?.clear(); this.history.clear(); this.selectedNodes.clear(); this.multiSelect = false; this.canvasCamera = null;
+    this.win.cancelAnimationFrame(this.rasterFrame); this.rasterFrame = 0;
+    this.win.cancelAnimationFrame(this.dimensionFrame); this.dimensionFrame = 0;
+    this.win.cancelAnimationFrame(this.geometryFrame); this.geometryFrame = 0;
+    this.autoPages.clear(); this.autoCards.clear(); this.layoutSaved = false;
+    this.cardSizes.clear(); this.cardSignatures.clear(); this.connections.clear(); this.thumbQueue = []; this.thumbRunning = false;
     this.groupElements.clear(); this.groupsEl?.empty();
     this.thumbObserver?.disconnect();
     for (const task of this.renderTasks) task.cancel();
@@ -520,6 +566,7 @@ export class PdfAnnotatorView extends FileView {
   }
   private save(): Promise<void> {
     if (!this.sidecar) return Promise.resolve();
+    this.layoutSaved = true;
     const path = `${this.sidecar.pdfPath}.obsidian-annot.json`, data = JSON.stringify(this.sidecar, null, 2);
     const generation = this.generation, revision = ++this.saveRevision;
     this.saveStatus.setText("Saving …");
@@ -545,24 +592,44 @@ export class PdfAnnotatorView extends FileView {
     try { await task.promise; } finally { this.renderTasks.delete(task); }
   }
   private queuePageRaster() {
-    if (this.pages?.surfaces.size) this.pages.update(this.mode, this.currentPage, this.camera.zoom, this.viewport);
+    if (this.rasterFrame || !this.pdf) return;
+    this.rasterFrame = this.win.requestAnimationFrame(() => this.refreshViewport());
+  }
+  private refreshViewport() {
+    this.win.cancelAnimationFrame(this.rasterFrame); this.rasterFrame = 0;
+    if (!this.sidecar || !this.pages.surfaces.size) return;
+    this.pages.update(this.mode, this.currentPage, this.camera.zoom, this.viewport, this.camera, this.layout.pages);
+    if (this.sidecar.annotations.length > 80 && this.syncCards()) { this.measureCards(); this.updateSelectionPaint(); this.queueGeometry(); }
   }
   private activatePage(pageNumber: number) {
     const surface = this.pages.surfaces.get(pageNumber); if (!surface) return;
+    const previous = this.currentPage;
     this.currentPage = pageNumber; this.pageEl = surface.body;
     this.pageWidth = surface.width; this.pageHeight = surface.height;
     this.pageReady = !!surface.canvas && !!surface.textLayer;
     this.pageInput.value = String(pageNumber);
-    this.thumbButtons.forEach((button, page) => { button.toggleClass("is-active", page === pageNumber); button.setAttribute("aria-current", page === pageNumber ? "page" : "false"); });
-    this.updateSidebar();
+    for (const number of new Set([previous, pageNumber])) {
+      const button = this.thumbButtons.get(number); if (button) { button.toggleClass("is-active", number === pageNumber); button.setAttribute("aria-current", number === pageNumber ? "page" : "false"); }
+    }
+    if (previous !== pageNumber) this.updateSidebar();
   }
   private async showPage(pageNumber: number, edge: "top" | "bottom" = "top") {
     if (!this.pdf || !Number.isInteger(pageNumber) || !this.pages.surfaces.has(pageNumber)) return;
     this.resetPinch(); this.stopGesture(); this.clearSelection(); this.win.getSelection()?.removeAllRanges(); this.commentPreview.hide();
-    this.activatePage(pageNumber); const token = ++this.pageGeneration;
+    const token = ++this.pageGeneration; this.pageReady = false;
+    try { if (!this.pages.surfaces.get(pageNumber)!.page) await this.pages.loadPage(pageNumber); }
+    catch (error) {
+      if (token !== this.pageGeneration) return;
+      this.pageReady = !!this.pageCanvas; this.pageInput.value = String(this.currentPage);
+      new Notice(`Could not load page ${pageNumber}. Select it again to retry.`);
+      console.warn("Remark My Words: page navigation", error); return;
+    }
+    if (token !== this.pageGeneration) return;
+    if (this.dimensionFrame) this.updateDimensions();
+    this.activatePage(pageNumber); this.pageReady = false;
     this.thumbButtons.get(pageNumber)?.scrollIntoView({ block: "nearest" });
-    this.renderFilters(); this.renderAnnotations();
-    if (this.mode === "canvas") this.focusPage(pageNumber); else { this.applyLayout(); this.fit(); }
+    if (this.mode === "reading") this.renderAnnotations(); else { this.syncCards(); this.applyLayout(); this.updateSidebar(); }
+    if (this.mode === "canvas") this.focusPage(pageNumber); else this.fit();
     await this.pages.ensure(pageNumber);
     if (token !== this.pageGeneration) return;
     this.pageReady = !!this.pageCanvas;
@@ -574,15 +641,28 @@ export class PdfAnnotatorView extends FileView {
       for (const entry of entries) if (entry.isIntersecting) {
         this.thumbObserver?.unobserve(entry.target);
         const button = entry.target as HTMLButtonElement;
-        void this.renderThumbnail(Number(button.dataset.page), button, generation);
+        this.thumbQueue.push(Number(button.dataset.page));
+        void this.pumpThumbnails(generation);
       }
     }, { root: this.thumbnails, rootMargin: "200px" });
     for (let page = 1; page <= this.pdf!.numPages; page++) {
       const button = this.thumbnails.createEl("button", { cls: "pdfaw-thumbnail", attr: { "aria-label": `Page ${page}`, "data-page": String(page) } });
       button.createDiv({ cls: "pdfaw-thumbnail-paper" }); button.createSpan({ text: String(page) });
       button.onclick = () => void this.showPage(page);
+      button.toggleClass("is-active", page === this.currentPage); button.setAttribute("aria-current", page === this.currentPage ? "page" : "false");
       this.thumbButtons.set(page, button); this.thumbObserver.observe(button);
     }
+  }
+  private async pumpThumbnails(generation: number) {
+    if (this.thumbRunning) return;
+    this.thumbRunning = true;
+    try {
+      while (generation === this.generation && this.thumbQueue.length) {
+        const number = this.thumbQueue.shift()!, button = this.thumbButtons.get(number);
+        if (button) await this.renderThumbnail(number, button, generation);
+        await new Promise<void>(resolve => this.win.setTimeout(resolve, 16));
+      }
+    } finally { if (generation === this.generation) this.thumbRunning = false; }
   }
   private async renderThumbnail(number: number, button: HTMLButtonElement, generation: number) {
     try {
@@ -636,7 +716,6 @@ export class PdfAnnotatorView extends FileView {
       surface.body.querySelector(".pdfaw-highlights")?.remove();
       overlays.set(surface.number, surface.body.createDiv({ cls: "pdfaw-highlights" }));
     }
-    this.cards.forEach(card => this.resizeObserver?.unobserve(card)); this.cards.clear(); this.cardsEl.empty();
     for (const annotation of this.visibleAnnotations()) {
       const category = this.categories.forAnnotation(annotation);
       for (const quad of annotation.quads) {
@@ -644,40 +723,74 @@ export class PdfAnnotatorView extends FileView {
         if (!highlight) continue;
         Object.assign(highlight.style, { left: `${quad.x}px`, top: `${quad.y}px`, width: `${quad.w}px`, height: `${quad.h}px`, backgroundColor: category.hex });
       }
-      const card = this.cardsEl.createDiv({ cls: "pdfaw-comment-card", attr: { tabindex: "0", "aria-label": `${category.label}: ${annotation.title || annotation.text}`, "data-id": annotation.id, "data-node": cardKey(annotation.id) } });
-      card.style.setProperty("--category", category.hex);
-      const position = this.position(annotation);
-      card.style.left = `${position.x}px`; card.style.top = `${position.y}px`; card.toggleClass("is-active", this.activeId === annotation.id);
-      const header = card.createDiv({ cls: "pdfaw-card-header" });
-      const badge = header.createDiv({ cls: "pdfaw-badge" });
-      setIcon(badge.createSpan(), category.icon); badge.createSpan({ text: category.label });
-      this.button(header, "ellipsis", "Comment actions", () => this.cardMenu(annotation, header));
-      header.onpointerdown = event => { if (!(event.target as HTMLElement).closest("button")) this.startNodeDrag(event, cardKey(annotation.id), header); };
-      card.onpointerdown = event => { if (event.button === 0 && !(event.target as HTMLElement).closest("button, .pdfaw-card-header")) { this.selectNode(cardKey(annotation.id), event.shiftKey || this.multiSelect); if (event.shiftKey || this.multiSelect) event.preventDefault(); } };
-      card.createEl("h3", { text: annotation.title || (annotation.comment ? "Comment" : "Highlighted passage") });
-      const body = card.createDiv({ cls: "pdfaw-comment-body" });
-      if (annotation.comment) body.createDiv({ text: annotation.comment }); else body.createEl("blockquote", { text: annotation.text });
-      if (annotation.tags?.length) {
-        const tags = card.createDiv({ cls: "pdfaw-tags" }); annotation.tags.forEach(tag => tags.createSpan({ text: tag }));
-      }
-      const footer = card.createDiv({ cls: "pdfaw-card-footer" });
-      const jump = footer.createEl("button", { text: `↗ p. ${annotation.page}`, attr: { "aria-label": "Go to highlighted passage" } });
-      jump.onclick = () => this.focusAnnotation(annotation);
-      footer.createEl("time", { text: new Date(annotation.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short" }), attr: { datetime: new Date(annotation.updatedAt).toISOString() } });
-      card.onfocus = () => this.selectNode(cardKey(annotation.id), false, true);
-      card.ondblclick = event => { if (!(event.target as HTMLElement).closest("button")) this.editAnnotation(annotation); };
-      card.onkeydown = event => {
-        if (event.target !== card) return;
-        if (event.key === "Enter") { event.preventDefault(); this.editAnnotation(annotation); }
-      };
-      this.cards.set(annotation.id, card); this.resizeObserver?.observe(card);
     }
+    this.syncCards(); this.measureCards();
     this.status.setText(`${this.file?.name ?? "PDF"}  /  Page ${this.currentPage}  ·  ${this.visibleAnnotations().length} of ${this.sidecar?.annotations.length ?? 0} annotations`);
     this.applyLayout(); this.updateSelectionPaint();
     if (this.sidebars.context?.owner === this || this.app.workspace.getActiveViewOfType(PdfAnnotatorView) === this) this.updateSidebar();
   }
-  rearrangeCards() {
-    if (!this.sidecar) return;
+  private createCard(annotation: Annotation): HTMLDivElement {
+    const category = this.categories.forAnnotation(annotation);
+    const card = this.cardsEl.createDiv({ cls: "pdfaw-comment-card", attr: { tabindex: "0", "aria-label": `${category.label}: ${annotation.title || annotation.text}`, "data-id": annotation.id, "data-node": cardKey(annotation.id) } });
+    card.style.setProperty("--category", category.hex);
+    const position = this.position(annotation);
+    card.style.left = `${position.x}px`; card.style.top = `${position.y}px`; card.toggleClass("is-active", this.activeId === annotation.id);
+    const header = card.createDiv({ cls: "pdfaw-card-header" });
+    const badge = header.createDiv({ cls: "pdfaw-badge" });
+    setIcon(badge.createSpan(), category.icon); badge.createSpan({ text: category.label });
+    this.button(header, "ellipsis", "Comment actions", () => this.cardMenu(annotation, header));
+    header.onpointerdown = event => { if (!(event.target as HTMLElement).closest("button")) this.startNodeDrag(event, cardKey(annotation.id), header); };
+    card.onpointerdown = event => { if (event.button === 0 && !(event.target as HTMLElement).closest("button, .pdfaw-card-header")) { this.selectNode(cardKey(annotation.id), event.shiftKey || this.multiSelect); if (event.shiftKey || this.multiSelect) event.preventDefault(); } };
+    card.createEl("h3", { text: annotation.title || (annotation.comment ? "Comment" : "Highlighted passage") });
+    const body = card.createDiv({ cls: "pdfaw-comment-body" });
+    if (annotation.comment) body.createDiv({ text: annotation.comment }); else body.createEl("blockquote", { text: annotation.text });
+    if (annotation.tags?.length) {
+      const tags = card.createDiv({ cls: "pdfaw-tags" }); annotation.tags.forEach(tag => tags.createSpan({ text: tag }));
+    }
+    const footer = card.createDiv({ cls: "pdfaw-card-footer" });
+    const jump = footer.createEl("button", { text: `↗ p. ${annotation.page}`, attr: { "aria-label": "Go to highlighted passage" } });
+    jump.onclick = () => this.focusAnnotation(annotation);
+    footer.createEl("time", { text: new Date(annotation.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short" }), attr: { datetime: new Date(annotation.updatedAt).toISOString() } });
+    card.onfocus = () => this.selectNode(cardKey(annotation.id), false, true);
+    card.ondblclick = event => { if (!(event.target as HTMLElement).closest("button")) this.editAnnotation(annotation); };
+    card.onkeydown = event => {
+      if (event.target !== card) return;
+      if (event.key === "Enter") { event.preventDefault(); this.editAnnotation(annotation); }
+    };
+    return card;
+  }
+  private syncCards(forceAll = false): boolean {
+    if (!this.sidecar) return false;
+    const virtual = !forceAll && this.sidecar.annotations.length > 80;
+    const z = this.camera.zoom, margin = 240 / z;
+    const area = { x: -this.camera.x / z - margin, y: -this.camera.y / z - margin, width: this.viewport.clientWidth / z + margin * 2, height: this.viewport.clientHeight / z + margin * 2 };
+    const wanted = new Set<string>(); let changed = false; let previous: HTMLElement | null = null;
+    const selection = this.win.getSelection();
+    for (const annotation of this.visibleAnnotations()) {
+      const existing = this.cards.get(annotation.id), position = this.position(annotation);
+      const pinned = existing && (existing.contains(this.contentEl.ownerDocument.activeElement) || !!selection?.anchorNode && !selection.isCollapsed && existing.contains(selection.anchorNode) || this.gesture?.nodes?.has(cardKey(annotation.id)));
+      if (virtual && !pinned && (this.mode === "reading" || !intersects(area, { ...position, width: CARD_WIDTH, height: this.cardSizes.get(annotation.id) ?? estimatedHeight(annotation) }))) continue;
+      wanted.add(annotation.id);
+      const signature = JSON.stringify([annotation.category, this.categories.forAnnotation(annotation), annotation.title, annotation.comment, annotation.text, annotation.tags, annotation.updatedAt]);
+      if (!existing || this.cardSignatures.get(annotation.id) !== signature) {
+        if (existing) { this.resizeObserver?.unobserve(existing); existing.remove(); }
+        const card = this.createCard(annotation); this.cards.set(annotation.id, card); this.cardSignatures.set(annotation.id, signature); this.resizeObserver?.observe(card); changed = true;
+      }
+      const card = this.cards.get(annotation.id)!;
+      const before: ChildNode | null = previous ? previous.nextSibling : this.cardsEl.firstChild;
+      if (card !== before) this.cardsEl.insertBefore(card, before);
+      previous = card; card.toggleClass("is-active", this.activeId === annotation.id);
+    }
+    for (const [id, card] of this.cards) if (!wanted.has(id)) {
+      this.resizeObserver?.unobserve(card); card.remove(); this.cards.delete(id); this.cardSignatures.delete(id); changed = true;
+    }
+    return changed;
+  }
+  async rearrangeCards() {
+    const data = this.sidecar; if (!data) return;
+    await this.pages.metadataReady; if (this.sidecar !== data) return;
+    if (this.dimensionFrame) this.updateDimensions();
+    this.autoPages.clear(); this.autoCards.clear(); this.syncCards(true);
     this.stopGesture(); const before = structuredClone(this.layout);
     arrangeLayout(this.layout, this.pages.sizes, this.sidecar.annotations, this.cardHeights());
     this.commitLayout(before); this.fit();
@@ -844,7 +957,7 @@ export class PdfAnnotatorView extends FileView {
         delta = snappedDelta(enclosingBounds(original), delta, [...boxes].filter(([key]) => !gesture.nodes!.has(key)).map(([, box]) => box), 8 / this.camera.zoom);
       }
       for (const [key, origin] of gesture.nodes) this.setNodePosition(key, { x: origin.x + delta.x, y: origin.y + delta.y });
-      this.applyLayout();
+      this.applyLayout(new Set(gesture.nodes.keys()));
     } else if (gesture.marquee) {
       const point = this.toWorld(event.clientX, event.clientY), origin = gesture.marquee;
       const rect = { x: Math.min(origin.x, point.x), y: Math.min(origin.y, point.y), width: Math.abs(point.x - origin.x), height: Math.abs(point.y - origin.y) };
@@ -944,7 +1057,7 @@ export class PdfAnnotatorView extends FileView {
     this.viewport.scrollTo(0, 0);
     if (mode === "reading") { this.applyLayout(); void this.showPage(this.currentPage); }
     else {
-      if (this.canvasCamera) { this.camera = this.canvasCamera; this.applyCamera(); } else this.fit();
+      if (this.canvasCamera) { this.camera = this.canvasCamera; this.applyCamera(); } else { void this.showPage(1); }
     }
   }
   private fit() {
@@ -977,21 +1090,30 @@ export class PdfAnnotatorView extends FileView {
     }
     this.stage.setCssProps({ "--canvas-transform": `translate(${x}px, ${y}px) scale(${zoom})` });
     this.viewport.style.backgroundPosition = `${x}px ${y}px`; this.viewport.style.backgroundSize = `${Math.max(12, 20 * zoom)}px ${Math.max(12, 20 * zoom)}px`;
-    this.zoomLabel.setText(`${zoom < 0.01 ? (zoom * 100).toFixed(1) : Math.round(zoom * 100)} %`); this.queuePageRaster(); this.positionSelectionBar(); this.queueGeometry();
+    this.zoomLabel.setText(`${zoom < 0.01 ? (zoom * 100).toFixed(1) : Math.round(zoom * 100)} %`); this.queuePageRaster(); this.positionSelectionBar();
   }
   private queueGeometry() {
     if (this.geometryFrame) return;
     this.geometryFrame = this.win.requestAnimationFrame(() => { this.geometryFrame = 0; if (this.mode === "canvas") { this.drawConnections(); this.renderGroups(); } });
   }
   private drawConnections() {
-    this.links.replaceChildren();
+    const ids = new Set<string>();
     for (const annotation of this.visibleAnnotations()) {
-      const card = this.cards.get(annotation.id); if (!card) continue;
-      const color = this.categories.forAnnotation(annotation).hex;
-      const { path, anchor } = connection({ ...this.position(annotation), width: CARD_WIDTH, height: card.offsetHeight }, { ...annotation.quads[0], x: annotation.quads[0].x + (this.layout.pages[annotation.page]?.x ?? 0), y: annotation.quads[0].y + (this.layout.pages[annotation.page]?.y ?? 0) });
-      svg(this.links, "path", { d: path, stroke: color, "stroke-width": 2, "stroke-dasharray": "8 7", "stroke-linecap": "round", fill: "none", "vector-effect": "non-scaling-stroke" });
-      svg(this.links, "circle", { cx: anchor.x, cy: anchor.y, r: 3, fill: color });
+      if (!this.cards.has(annotation.id)) continue;
+      ids.add(annotation.id);
+      const color = this.categories.forAnnotation(annotation).hex, position = this.position(annotation), origin = this.layout.pages[annotation.page] ?? { x: 0, y: 0 };
+      const height = this.cardSizes.get(annotation.id) ?? estimatedHeight(annotation);
+      const signature = JSON.stringify([position, origin, height, color, annotation.quads[0]]);
+      let elements = this.connections.get(annotation.id);
+      if (elements?.signature === signature) continue;
+      const { path, anchor } = connection({ ...position, width: CARD_WIDTH, height }, { ...annotation.quads[0], x: annotation.quads[0].x + origin.x, y: annotation.quads[0].y + origin.y });
+      if (!elements) {
+        elements = { path: svg(this.links, "path", { "stroke-width": 2, "stroke-dasharray": "8 7", "stroke-linecap": "round", fill: "none", "vector-effect": "non-scaling-stroke" }), anchor: svg(this.links, "circle", { r: 3 }), signature: "" }; this.connections.set(annotation.id, elements);
+      }
+      elements.path.setAttribute("d", path); elements.path.setAttribute("stroke", color);
+      elements.anchor.setAttribute("cx", String(anchor.x)); elements.anchor.setAttribute("cy", String(anchor.y)); elements.anchor.setAttribute("fill", color); elements.signature = signature;
     }
+    for (const [id, elements] of this.connections) if (!ids.has(id)) { elements.path.remove(); elements.anchor.remove(); this.connections.delete(id); }
   }
   private onKey(event: KeyboardEvent) {
     if (event.key === "Escape") this.commentPreview.hide();

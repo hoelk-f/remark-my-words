@@ -15,7 +15,7 @@ const app = { vault: {
   getName: () => 'Test vault',
   getAbstractFileByPath: path => files.get(path),
   read: async file => storage.get(file.path),
-  readBinary: async file => (await fetch(file.path==='Long.pdf'?'/long-fixture.pdf':'/fixture.pdf')).arrayBuffer(),
+  readBinary: async file => (await fetch(file.path==='Long.pdf'?'/long-fixture.pdf':file.path==='Complex.pdf'?'/complex-fixture.pdf':'/fixture.pdf')).arrayBuffer(),
   create: async (path, data) => { storage.set(path, data); const file=new TFile(path);files.set(path, file);return file; },
   modify: async (file, data) => { storage.set(file.path, data); },
   process: async (file, fn) => { const data=fn(storage.get(file.path));storage.set(file.path,data);return data; },

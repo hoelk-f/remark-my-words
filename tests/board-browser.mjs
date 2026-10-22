@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 export async function testBoard({evaluate,until,cdp}) {
   const mouse = (type,x,y,modifiers=0) => cdp('Input.dispatchMouseEvent',{type,x,y,button:'left',buttons:type==='mouseReleased'?0:1,clickCount:type==='mouseMoved'?0:1,modifiers});
   const drag = async (selector,dx,dy,modifiers=0) => {
+    await until('view.geometryFrame===0 && view.rasterFrame===0');
     const p=await evaluate(`(() => {const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+Math.min(25,r.width/2),y:r.y+r.height/2};})()`);
     await mouse('mousePressed',p.x,p.y,modifiers); await mouse('mouseMoved',p.x+dx,p.y+dy,modifiers); await mouse('mouseReleased',p.x+dx,p.y+dy,modifiers); await evaluate('view.saveQueue');
   };
   const key = async (key,modifiers=0) => {await cdp('Input.dispatchKeyEvent',{type:'keyDown',key,modifiers});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key,modifiers});};
   await cdp('Emulation.setDeviceMetricsOverride',{width:1672,height:941,deviceScaleFactor:1,mobile:false});
-  await evaluate(`view.setMode('canvas');view.filter=null;view.renderAnnotations();view.rearrangeCards();getSelection().removeAllRanges()`);
+  await evaluate(`(async()=>{view.setMode('canvas');view.filter=null;view.renderAnnotations();await view.rearrangeCards();getSelection().removeAllRanges()})()`);
   await until('view.rasterTimer === undefined && [...view.pages.surfaces.values()].every(s=>!s.pending)');
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-modes button").length'),2,'One Canvas and one Reading mode');
   assert.equal(await evaluate('document.querySelectorAll(".pdfaw-page-node:not([hidden])").length'),2,'Every PDF page is on the same board');
@@ -25,7 +26,7 @@ export async function testBoard({evaluate,until,cdp}) {
   await evaluate(`(() => {const span=view.pageEl.querySelector('.pdfaw-textlayer span'),r=document.createRange();r.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(r);view.captureSelection();})()`);
   assert.equal(await evaluate('view.selection.page'),2,'Selection resolves the page that owns the text layer');
   assert.ok(await evaluate('view.selection.quads[0].x > 0 && view.selection.quads[0].x < view.pageWidth'),'Highlight coordinates stay page-local');
-  await evaluate(`view.clearSelection();getSelection().removeAllRanges();view.rearrangeCards();view.selectedNodes.clear();view.updateSelectionPaint()`);
+  await evaluate(`(async()=>{view.clearSelection();getSelection().removeAllRanges();await view.rearrangeCards();view.selectedNodes.clear();view.updateSelectionPaint()})()`);
   // Real marquee selection across the complete fitted board.
   const area=await evaluate('(() => {const r=view.viewport.getBoundingClientRect();return {x:r.left,y:r.top,w:r.width,h:r.height};})()');
   await mouse('mousePressed',area.x+5,area.y+55);await mouse('mouseMoved',area.x+area.w-5,area.y+area.h-5);await mouse('mouseReleased',area.x+area.w-5,area.y+area.h-5);
@@ -61,11 +62,13 @@ export async function testBoard({evaluate,until,cdp}) {
   assert.equal(await evaluate('JSON.stringify(view.sidecar.annotations)'),snapshot,'Board commands do not rewrite comments, PDF quads or legacy positions');
   assert.equal(await evaluate('[...storage.keys()].some(path=>path.endsWith(".canvas"))'),false,'The unified view never creates a second Canvas file');
   await evaluate('view.camera={x:100000,y:100000,zoom:1};view.applyCamera()');
-  await until('[...view.pages.surfaces.values()].every(s=>!s.canvas && !s.textLayer && !s.pending)');
+  await until('view.rasterFrame===0 && [...view.pages.surfaces.values()].every(s=>!s.wanted && !s.pending)');
+  assert.ok(await evaluate('[...view.pages.surfaces.values()].filter(s=>s.canvas).length<=3'), 'Offscreen cache is bounded');
   await evaluate('view.showPage(2)');
   assert.ok(await evaluate('!!view.pages.surfaces.get(2).canvas && !!view.pages.surfaces.get(2).textLayer'),'Offscreen rasters are released and recreated on navigation');
   await evaluate('view.showPage(1);view.toggleSnap()');
   await evaluate('view.onLoadFile(new TFile("Long.pdf"))');
+  await evaluate('view.pages.metadataReady');
   assert.equal(await evaluate('view.pages.surfaces.size'),120,'Long documents create every page surface');
   await evaluate('view.showPage(60)');
   await until('view.rasterTimer===undefined && [...view.pages.surfaces.values()].every(s=>!s.pending)');

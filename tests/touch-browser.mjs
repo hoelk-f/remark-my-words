@@ -8,7 +8,7 @@ export async function testTouch({ evaluate, until, cdp }) {
     if (type === 'touchStart') touching = true;
     if (type === 'touchCancel' || (type === 'touchEnd' && !touchPoints.length)) touching = false;
   };
-  const settled = () => until('view.pageReady && view.rasterTimer === undefined && view.pageTask === null');
+  const settled = () => until('view.pageReady && view.rasterFrame === 0 && view.rasterTimer === undefined && view.pageTask === null');
   const zoom = () => evaluate('view.camera.zoom');
   const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 0.02, `${label}: ${actual} vs ${expected}`);
   const annotations = await evaluate('JSON.stringify(view.sidecar.annotations)');

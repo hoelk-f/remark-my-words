@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 export async function testRendering({ evaluate, until, cdp }) {
-  const settled = () => until('view.pageReady && view.rasterTimer === undefined && view.pageTask === null && view.rasterDensity === view.requestedDensity');
+  const settled = () => until('view.pageReady && view.rasterFrame === 0 && view.rasterTimer === undefined && view.pageTask === null && view.rasterDensity === view.requestedDensity');
   for (const mode of ['canvas', 'reading']) {
     await evaluate(`view.setMode('${mode}')`);
     await settled();
